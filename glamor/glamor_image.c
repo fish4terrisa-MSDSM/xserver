@@ -306,8 +306,13 @@ glamor_put_image(DrawablePtr drawable, GCPtr gc, int depth, int x, int y,
             return;
         break;
     case XYBitmap:
-        if (glamor_put_image_xybitmap_gl(drawable, gc, x, y, w, h, leftPad, bits))
-            return;
+        if (w * h >= 100 * 100) {
+            if (glamor_put_image_xybitmap_gl(drawable, gc, x, y, w, h, leftPad, bits))
+                return;
+        } else {
+            if (glamor_put_image_xy_gl(drawable, gc, depth, x, y, w, h, leftPad, format, bits))
+                return;
+        }
         break;
     }
     glamor_put_image_bail(drawable, gc, depth, x, y, w, h, leftPad, format, bits);
