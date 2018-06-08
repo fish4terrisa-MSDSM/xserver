@@ -81,6 +81,19 @@ For example:
 Option \*qZaphodHeads\*q \*qLVDS,VGA-0\*q
 will assign xrandr outputs LVDS and VGA-0 to this instance of the driver.
 .TP
+.BI "Option \*qShadowPrimary\*q \*q" boolean \*q
+This option enables a so-called "shadow primary" buffer for fast CPU access to
+pixel data, and separate scanout buffers for each display controller (CRTC).
+This may improve performance for some 2D workloads, potentially at the expense
+of other (e.g. 3D, video) workloads. This option may be enabled automatically
+when the root window size exceeds the maximum stride supported by the display
+controler of your GPU. It is recommended to use the XRender backend of your
+compositor when enabling this feature.
+.br
+In an effort to reduce the performance cost, the latency may be negatively
+affected. The default is
+.B off.
+.TP
 .SH "SEE ALSO"
 @xservername@(@appmansuffix@), @xconfigfile@(@filemansuffix@), Xserver(@appmansuffix@),
 X(@miscmansuffix@)
