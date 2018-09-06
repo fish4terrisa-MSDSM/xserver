@@ -105,7 +105,8 @@ typedef struct _ColormapRec {
     Entry *red;
     Entry *green;
     Entry *blue;
-    PrivateRec *devPrivates;
+    void *devPrivate;           /* for the screen's colormap system */
+    PrivateRec *devPrivates;    /* for XACE's sake only */
 } ColormapRec;
 
 #endif                          /* COLORMAP_H */
