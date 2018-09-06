@@ -256,23 +256,13 @@ CreateColormap(Colormap mid, ScreenPtr pScreen, VisualPtr pVisual,
     if ((class | DynamicClass) == DirectColor)
         sizebytes *= 3;
     sizebytes += sizeof(ColormapRec);
-    if (mid == pScreen->defColormap) {
-        pmap = malloc(sizebytes);
-        if (!pmap)
-            return BadAlloc;
-        if (!dixAllocatePrivates(&pmap->devPrivates, PRIVATE_COLORMAP)) {
-            free(pmap);
-            return BadAlloc;
-        }
-    }
-    else {
-        pmap = _dixAllocateObjectWithPrivates(sizebytes, sizebytes,
-                                              offsetof(ColormapRec,
-                                                       devPrivates),
-                                              PRIVATE_COLORMAP);
-        if (!pmap)
-            return BadAlloc;
-    }
+    pmap = _dixAllocateObjectWithPrivates(sizebytes, sizebytes,
+                                          offsetof(ColormapRec,
+                                                   devPrivates),
+                                          PRIVATE_SCREEN /* XXX */);
+    if (!pmap)
+        return BadAlloc;
+
     pmap->red = (EntryPtr) ((char *) pmap + sizeof(ColormapRec));
     sizebytes = size * sizeof(Entry);
     pmap->clientPixelsRed = (Pixel **) ((char *) pmap->red + sizebytes);
@@ -440,12 +430,7 @@ FreeColormap(void *value, XID mid)
         }
     }
 
-    if (pmap->flags & IsDefault) {
-        dixFreePrivates(pmap->devPrivates, PRIVATE_COLORMAP);
-        free(pmap);
-    }
-    else
-        dixFreeObjectWithPrivates(pmap, PRIVATE_COLORMAP);
+    dixFreeObjectWithPrivates(pmap, PRIVATE_SCREEN);
     return Success;
 }
 

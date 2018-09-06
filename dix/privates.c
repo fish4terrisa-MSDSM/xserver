@@ -73,7 +73,6 @@ static const Bool xselinux_private[PRIVATE_LAST] = {
     [PRIVATE_PIXMAP] = TRUE,
     [PRIVATE_GC] = TRUE,
     [PRIVATE_CURSOR] = TRUE,
-    [PRIVATE_COLORMAP] = TRUE,
     [PRIVATE_DEVICE] = TRUE,
     [PRIVATE_EXTENSION] = TRUE,
     [PRIVATE_SELECTION] = TRUE,
@@ -91,7 +90,6 @@ static const char *key_names[PRIVATE_LAST] = {
     /* These can have objects created before all of the keys are registered */
     [PRIVATE_SCREEN] = "SCREEN",
     [PRIVATE_EXTENSION] = "EXTENSION",
-    [PRIVATE_COLORMAP] = "COLORMAP",
     [PRIVATE_DEVICE] = "DEVICE",
 
     /* These cannot have any objects before all relevant keys are registered */
@@ -118,7 +116,6 @@ static const Bool screen_specific_private[PRIVATE_LAST] = {
     [PRIVATE_PIXMAP] = TRUE,
     [PRIVATE_GC] = TRUE,
     [PRIVATE_CURSOR] = FALSE,
-    [PRIVATE_COLORMAP] = FALSE,
     [PRIVATE_DEVICE] = FALSE,
     [PRIVATE_EXTENSION] = FALSE,
     [PRIVATE_SELECTION] = FALSE,
@@ -251,24 +248,6 @@ fixupExtensions(FixupFunc fixup, unsigned bytes)
 }
 
 static Bool
-fixupDefaultColormaps(FixupFunc fixup, unsigned bytes)
-{
-    int s;
-
-    for (s = 0; s < screenInfo.numScreens; s++) {
-        ColormapPtr cmap;
-
-        dixLookupResourceByType((void **) &cmap,
-                                screenInfo.screens[s]->defColormap, RT_COLORMAP,
-                                serverClient, DixCreateAccess);
-        if (cmap &&
-            !fixup(&cmap->devPrivates, screenInfo.screens[s]->screenSpecificPrivates[PRIVATE_COLORMAP].offset, bytes))
-            return FALSE;
-    }
-    return TRUE;
-}
-
-static Bool
 fixupDeviceList(DeviceIntPtr device, FixupFunc fixup, unsigned bytes)
 {
     while (device) {
@@ -290,7 +269,6 @@ static Bool (*const allocated_early[PRIVATE_LAST]) (FixupFunc, unsigned) = {
     [PRIVATE_SCREEN] = fixupScreens,
     [PRIVATE_CLIENT] = fixupServerClient,
     [PRIVATE_EXTENSION] = fixupExtensions,
-    [PRIVATE_COLORMAP] = fixupDefaultColormaps,
     [PRIVATE_DEVICE] = fixupDevices,
 };
 
@@ -476,7 +454,7 @@ _dixAllocateObjectWithPrivates(unsigned baseSize, unsigned clear,
     PrivatePtr privates;
     PrivatePtr *devPrivates;
 
-    assert(type > PRIVATE_SCREEN && type < PRIVATE_LAST);
+    assert(type >= PRIVATE_SCREEN && type < PRIVATE_LAST);
     assert(!screen_specific_private[type]);
 
     /* round up so that void * is aligned */

@@ -32,7 +32,6 @@ typedef enum {
     /* These can have objects created before all of the keys are registered */
     PRIVATE_SCREEN,
     PRIVATE_EXTENSION,
-    PRIVATE_COLORMAP,
     PRIVATE_DEVICE,
 
     /* These cannot have any objects before all relevant keys are registered */
