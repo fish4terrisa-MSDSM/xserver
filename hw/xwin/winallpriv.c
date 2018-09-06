@@ -152,12 +152,6 @@ winAllocateCmapPrivates(ColormapPtr pCmap)
     /* Initialize the memory of the private structure */
     ZeroMemory(pCmapPriv, sizeof(winPrivCmapRec));
 
-    /* Register our colourmap private */
-    if (!dixRegisterPrivateKey(g_iCmapPrivateKey, PRIVATE_COLORMAP, 0)) {
-        ErrorF("winAllocateCmapPrivates - AllocateCmapPrivate () failed\n");
-        return FALSE;
-    }
-
     /* Save the cmap private pointer */
     winSetCmapPriv(pCmap, pCmapPriv);
 

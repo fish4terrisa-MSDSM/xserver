@@ -612,11 +612,10 @@ extern FARPROC g_fpDirectDrawCreateClipper;
  * Colormap privates macros
  */
 
-#define winGetCmapPriv(pCmap) ((winPrivCmapPtr) \
-    dixLookupPrivate(&(pCmap)->devPrivates, g_iCmapPrivateKey))
+#define winGetCmapPriv(pCmap) ((winPrivCmapPtr) (pCmap)->devPrivates)
 
 #define winSetCmapPriv(pCmap,v) \
-    dixSetPrivate(&(pCmap)->devPrivates, g_iCmapPrivateKey, v)
+    do { (pCmap)->devPrivate = v; } while (0)
 
 #define winCmapPriv(pCmap) \
 	winPrivCmapPtr pCmapPriv = winGetCmapPriv(pCmap)
