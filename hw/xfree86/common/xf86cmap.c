@@ -105,9 +105,6 @@ static DevPrivateKeyRec CMapScreenKeyRec;
 
 #define CMapScreenKeyRegistered dixPrivateKeyRegistered(&CMapScreenKeyRec)
 #define CMapScreenKey (&CMapScreenKeyRec)
-static DevPrivateKeyRec CMapColormapKeyRec;
-
-#define CMapColormapKey (&CMapColormapKeyRec)
 
 static void CMapInstallColormap(ColormapPtr);
 static void CMapStoreColors(ColormapPtr, int, xColorItem *);
@@ -136,8 +133,6 @@ xf86ColormapAllocatePrivates(ScrnInfoPtr pScrn)
     if (!dixRegisterPrivateKey(&CMapScreenKeyRec, PRIVATE_SCREEN, 0))
         return FALSE;
 
-    if (!dixRegisterPrivateKey(&CMapColormapKeyRec, PRIVATE_COLORMAP, 0))
-        return FALSE;
     return TRUE;
 }
 
@@ -282,7 +277,7 @@ CMapAllocateColormapPrivate(ColormapPtr pmap)
         return FALSE;
     }
 
-    dixSetPrivate(&pmap->devPrivates, CMapColormapKey, pColPriv);
+    pmap->devPrivate = pColPriv;
 
     pColPriv->numColors = numColors;
     pColPriv->colors = colors;
@@ -324,8 +319,7 @@ CMapDestroyColormap(ColormapPtr cmap)
     ScreenPtr pScreen = cmap->pScreen;
     CMapScreenPtr pScreenPriv =
         (CMapScreenPtr) dixLookupPrivate(&pScreen->devPrivates, CMapScreenKey);
-    CMapColormapPtr pColPriv =
-        (CMapColormapPtr) dixLookupPrivate(&cmap->devPrivates, CMapColormapKey);
+    CMapColormapPtr pColPriv = cmap->devPrivate;
     CMapLinkPtr prevLink = NULL, pLink = pScreenPriv->maps;
 
     if (pColPriv) {
@@ -375,9 +369,7 @@ CMapStoreColors(ColormapPtr pmap, int ndef, xColorItem * pdefs)
         return;
 
     if (pVisual->class == DirectColor) {
-        CMapColormapPtr pColPriv =
-            (CMapColormapPtr) dixLookupPrivate(&pmap->devPrivates,
-                                               CMapColormapKey);
+        CMapColormapPtr pColPriv = pmap->devPrivate;
         int i;
 
         if (CMapColormapUseMax(pVisual, pScreenPriv)) {
@@ -527,8 +519,7 @@ CMapReinstallMap(ColormapPtr pmap)
     CMapScreenPtr pScreenPriv =
         (CMapScreenPtr) dixLookupPrivate(&pmap->pScreen->devPrivates,
                                          CMapScreenKey);
-    CMapColormapPtr cmapPriv =
-        (CMapColormapPtr) dixLookupPrivate(&pmap->devPrivates, CMapColormapKey);
+    CMapColormapPtr cmapPriv = pmap->devPrivate;
     ScrnInfoPtr pScrn = xf86ScreenToScrn(pmap->pScreen);
     int i = cmapPriv->numColors;
     int *indices = pScreenPriv->PreAllocIndices;
@@ -558,8 +549,7 @@ CMapRefreshColors(ColormapPtr pmap, int defs, int *indices)
     CMapScreenPtr pScreenPriv =
         (CMapScreenPtr) dixLookupPrivate(&pmap->pScreen->devPrivates,
                                          CMapScreenKey);
-    CMapColormapPtr pColPriv =
-        (CMapColormapPtr) dixLookupPrivate(&pmap->devPrivates, CMapColormapKey);
+    CMapColormapPtr pColPriv = pmap->devPrivate;
     VisualPtr pVisual = pmap->pVisual;
     ScrnInfoPtr pScrn = xf86ScreenToScrn(pmap->pScreen);
     int numColors, i;
@@ -690,8 +680,7 @@ CMapSetOverscan(ColormapPtr pmap, int defs, int *indices)
     CMapScreenPtr pScreenPriv =
         (CMapScreenPtr) dixLookupPrivate(&pmap->pScreen->devPrivates,
                                          CMapScreenKey);
-    CMapColormapPtr pColPriv =
-        (CMapColormapPtr) dixLookupPrivate(&pmap->devPrivates, CMapColormapKey);
+    CMapColormapPtr pColPriv = pmap->devPrivate;
     ScrnInfoPtr pScrn = xf86ScreenToScrn(pmap->pScreen);
     VisualPtr pVisual = pmap->pVisual;
     int i;
@@ -936,8 +925,7 @@ CMapChangeGamma(ScrnInfoPtr pScrn, Gamma gamma)
     /* mark all colormaps on this screen */
     pLink = pScreenPriv->maps;
     while (pLink) {
-        pColPriv = (CMapColormapPtr) dixLookupPrivate(&pLink->cmap->devPrivates,
-                                                      CMapColormapKey);
+        pColPriv = pLink->cmap->devPrivate;
         pColPriv->recalculate = TRUE;
         pLink = pLink->next;
     }
@@ -1025,8 +1013,7 @@ xf86ChangeGammaRamp(ScreenPtr pScreen,
     /* mark all colormaps on this screen */
     pLink = pScreenPriv->maps;
     while (pLink) {
-        pColPriv = (CMapColormapPtr) dixLookupPrivate(&pLink->cmap->devPrivates,
-                                                      CMapColormapKey);
+        pColPriv = pLink->cmap->devPrivate;
         pColPriv->recalculate = TRUE;
         pLink = pLink->next;
     }
