@@ -151,10 +151,6 @@ xnestOpenScreen(ScreenPtr pScreen, int argc, char *argv[])
     if (!dixRegisterPrivateKey
         (&xnestPixmapPrivateKeyRec, PRIVATE_PIXMAP, sizeof(xnestPrivPixmap)))
         return FALSE;
-    if (!dixRegisterPrivateKey
-        (&xnestColormapPrivateKeyRec, PRIVATE_COLORMAP,
-         sizeof(xnestPrivColormap)))
-        return FALSE;
     if (!dixRegisterPrivateKey(&xnestCursorScreenKeyRec, PRIVATE_SCREEN, 0))
         return FALSE;
 

@@ -21,10 +21,6 @@ is" without express or implied warranty.
 #define MINCMAPS 1
 
 typedef struct {
-    Colormap colormap;
-} xnestPrivColormap;
-
-typedef struct {
     int numCmapIDs;
     Colormap *cmapIDs;
     int numWindows;
@@ -32,12 +28,7 @@ typedef struct {
     int index;
 } xnestInstalledColormapWindows;
 
-extern DevPrivateKeyRec xnestColormapPrivateKeyRec;
-
-#define xnestColormapPriv(pCmap) \
-  ((xnestPrivColormap *) dixLookupPrivate(&(pCmap)->devPrivates, &xnestColormapPrivateKeyRec))
-
-#define xnestColormap(pCmap) (xnestColormapPriv(pCmap)->colormap)
+#define xnestColormap(pCmap) ((uintptr_t) (pCmap)->devPrivate)
 
 #define xnestPixel(pixel) (pixel)
 

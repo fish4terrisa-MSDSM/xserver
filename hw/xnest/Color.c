@@ -33,8 +33,6 @@ is" without express or implied warranty.
 #include "XNWindow.h"
 #include "Args.h"
 
-DevPrivateKeyRec xnestColormapPrivateKeyRec;
-
 static DevPrivateKeyRec cmapScrPrivateKeyRec;
 
 #define cmapScrPrivateKey (&cmapScrPrivateKeyRec)
@@ -50,15 +48,17 @@ xnestCreateColormap(ColormapPtr pCmap)
     int i, ncolors;
     Pixel red, green, blue;
     Pixel redInc, greenInc, blueInc;
+    Colormap colormap;
 
     pVisual = pCmap->pVisual;
     ncolors = pVisual->ColormapEntries;
 
-    xnestColormapPriv(pCmap)->colormap =
-        XCreateColormap(xnestDisplay,
-                        xnestDefaultWindows[pCmap->pScreen->myNum],
-                        xnestVisual(pVisual),
-                        (pVisual->class & DynamicClass) ? AllocAll : AllocNone);
+    colormap = XCreateColormap(xnestDisplay,
+                               xnestDefaultWindows[pCmap->pScreen->myNum],
+                               xnestVisual(pVisual),
+                               (pVisual->class & DynamicClass) ? AllocAll
+                                                               : AllocNone);
+    pCmap->devPrivate = (void *) (uintptr_t) colormap;
 
     switch (pVisual->class) {
     case StaticGray:           /* read only */
