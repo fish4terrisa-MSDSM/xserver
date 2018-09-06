@@ -71,7 +71,6 @@ DevPrivateKeyRec dmxWinPrivateKeyRec;
 DevPrivateKeyRec dmxPixPrivateKeyRec;
 int dmxFontPrivateIndex;        /**< Private index for Fonts     */
 DevPrivateKeyRec dmxScreenPrivateKeyRec;
-DevPrivateKeyRec dmxColormapPrivateKeyRec;
 DevPrivateKeyRec dmxPictPrivateKeyRec;
 DevPrivateKeyRec dmxGlyphSetPrivateKeyRec;
 
@@ -193,8 +192,6 @@ dmxScreenInit(ScreenPtr pScreen, int argc, char *argv[])
     int i, j;
 
     if (!dixRegisterPrivateKey(&dmxScreenPrivateKeyRec, PRIVATE_SCREEN, 0))
-        return FALSE;
-    if (!dixRegisterPrivateKey(&dmxColormapPrivateKeyRec, PRIVATE_COLORMAP, 0))
         return FALSE;
     if (!dixRegisterPrivateKey(&dmxGlyphSetPrivateKeyRec, PRIVATE_GLYPHSET, 0))
         return FALSE;

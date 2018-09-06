@@ -56,10 +56,9 @@ extern Bool dmxBEFreeColormap(ColormapPtr pColormap);
 
 /** Set colormap private structure. */
 #define DMX_SET_COLORMAP_PRIV(_pCMap, _pCMapPriv)			\
-    dixSetPrivate(&(_pCMap)->devPrivates, dmxColormapPrivateKey, _pCMapPriv)
+    do { (_pCMap)->devPrivate = _pCMapPriv; } while (0)
 
 /** Get colormap private structure. */
-#define DMX_GET_COLORMAP_PRIV(_pCMap) (dmxColormapPrivPtr)		\
-    dixLookupPrivate(&(_pCMap)->devPrivates, dmxColormapPrivateKey)
+#define DMX_GET_COLORMAP_PRIV(_pCMap) (dmxColormapPrivPtr) (_pCMap)->devPrivate
 
 #endif                          /* DMXCMAP_H */
