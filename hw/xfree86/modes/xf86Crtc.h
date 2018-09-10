@@ -830,9 +830,7 @@ typedef struct _xf86CrtcConfig {
 #endif
 } xf86CrtcConfigRec, *xf86CrtcConfigPtr;
 
-extern _X_EXPORT int xf86CrtcConfigPrivateIndex;
-
-#define XF86_CRTC_CONFIG_PTR(p)	((xf86CrtcConfigPtr) ((p)->privates[xf86CrtcConfigPrivateIndex].ptr))
+extern _X_EXPORT xf86CrtcConfigPtr XF86_CRTC_CONFIG_PTR(ScrnInfoPtr pScrn);
 
 static _X_INLINE xf86OutputPtr
 xf86CompatOutput(ScrnInfoPtr pScrn)
