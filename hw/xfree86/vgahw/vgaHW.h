@@ -26,13 +26,6 @@
 #include "globals.h"
 #include <X11/extensions/dpmsconst.h>
 
-extern _X_EXPORT int vgaHWGetIndex(void);
-
-/*
- * access macro
- */
-#define VGAHWPTR(p) ((vgaHWPtr)((p)->privates[vgaHWGetIndex()].ptr))
-
 /* Standard VGA registers */
 #define VGA_ATTR_INDEX		0x3C0
 #define VGA_ATTR_DATA_W		0x3C0
@@ -177,6 +170,8 @@ typedef struct _vgaHWRec {
 /* Function Prototypes */
 
 /* vgaHW.c */
+
+extern _X_EXPORT vgaHWPtr VGAHWPTR(ScrnInfoPtr pScrn);
 
 typedef void vgaHWProtectProc(ScrnInfoPtr, Bool);
 typedef void vgaHWBlankScreenProc(ScrnInfoPtr, Bool);
