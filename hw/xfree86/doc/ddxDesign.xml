@@ -1093,13 +1093,8 @@ Here is what <function>InitOutput()</function> does:
       within this function, it must be unmapped before returning.  Driver
       specific information should be stored in a structure hooked into
       the <structname>ScrnInfoRec</structname>'s <structfield>driverPrivate</structfield>
-      field.  Any other modules which require persistent data (ie data
-      that persists across server generations) should be initialised in
-      this function, and they should allocate a <quote>privates</quote> index to
-      hook their data into by calling
-      <function>xf86AllocateScrnInfoPrivateIndex()</function>.  The <quote>privates</quote>
-      data is persistent.
-	    </para>
+      field.
+            </para>
 
 	    <para>
       Helper functions for some of these things are provided at the
@@ -2079,53 +2074,6 @@ functions, and Close functions for other modules that it calls.  A new
 	  </blockquote>
 	</para></blockquote>
 
-      <para>
-The <structname>ScrnInfoRec</structname> <structfield>privates</structfield> data persists
-for the life of the server, so only needs to be allocated once.  This
-should be done from the <function>ChipPreInit()</function> function, and Init
-functions for other modules that it calls.  Data allocated in this way
-should be freed by the driver's <function>ChipFreeScreen()</function> functions,
-and Free functions for other modules that it calls.  A new
-<structfield>privates</structfield> entry is allocated by calling the
-<function>xf86AllocateScrnInfoPrivateIndex()</function> function.
-      </para>
-
-      <blockquote><para>
-	  <programlisting>
-    int xf86AllocateScrnInfoPrivateIndex();
-	  </programlisting>
-	  <blockquote><para>
-      This function allocates a new element in the <structfield>privates</structfield>
-      field of all currently existing <varname>ScrnInfoRecs</varname>.
-      The return value is the index of this new element in the
-      <structfield>privates</structfield> array.  The <structfield>privates</structfield>
-      field is of type <structfield>DevUnion</structfield>:
-
-	      <programlisting>
-        typedef union _DevUnion {
-            pointer             ptr;
-            long                val;
-            unsigned long       uval;
-            pointer             (*fptr)(void);
-        } DevUnion;
-	      </programlisting>
-
-      which allows the element to be used for any of the above types.
-      It is commonly used as a pointer to data that the caller allocates
-      after the new index has been allocated.
-	    </para>
-
-	    <para>
-      This function will not return when there is an error allocating
-      the new index.  When there is an error it will cause the server
-      to exit with a fatal error.  The similar function for allocation
-      privates in the <structname>ScreenRec</structname>
-      (<function>AllocateScreenPrivateIndex()</function>) differs in this
-      respect by returning <constant>-1</constant> when the allocation fails.
-	    </para>
-
-	  </blockquote>
-	</para></blockquote>
     </sect2>
   </sect1>
 
