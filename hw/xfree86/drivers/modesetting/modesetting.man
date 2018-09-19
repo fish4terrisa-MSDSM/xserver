@@ -102,6 +102,11 @@ allocating two separate scanout buffers for each non-rotated CRTC.
 This feature may reduce performance, increase latency and introduce stuttering. The default is
 .B off.
 .TP
+.BI "Option \*qNoAtomic\*q \*q" boolean \*q
+Disable atomic mode setting usage. Useful during developement for validating
+legacy codepaths. The default is
+.B off.
+.TP
 .SH "SEE ALSO"
 @xservername@(@appmansuffix@), @xconfigfile@(@filemansuffix@), Xserver(@appmansuffix@),
 X(@miscmansuffix@)

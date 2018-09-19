@@ -133,6 +133,7 @@ static const OptionInfoRec Options[] = {
     {OPTION_DOUBLE_SHADOW, "DoubleShadow", OPTV_BOOLEAN, {0}, FALSE},
     {OPTION_SHADOW_PRIMARY, "ShadowPrimary", OPTV_BOOLEAN, {0}, FALSE},
     {OPTION_TEARFREE, "TearFree", OPTV_BOOLEAN, {0}, FALSE},
+    {OPTION_NO_ATOMIC, "NoAtomic", OPTV_BOOLEAN, {0}, FALSE},
     {-1, NULL, OPTV_NONE, {0}, FALSE}
 };
 
@@ -1124,8 +1125,17 @@ PreInit(ScrnInfoPtr pScrn, int flags)
 #endif
     }
 
-    ret = drmSetClientCap(ms->fd, DRM_CLIENT_CAP_ATOMIC, 1);
-    ms->atomic_modeset = (ret == 0);
+    if (!xf86ReturnOptValBool(ms->drmmode.Options, OPTION_NO_ATOMIC, FALSE)) {
+        ret = drmSetClientCap(ms->fd, DRM_CLIENT_CAP_ATOMIC, 1);
+        ms->atomic_modeset = (ret == 0);
+        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Atomic Mode Setting support: %s\n",
+                                             ms->atomic_modeset ? "True" : "False");
+    } else {
+        ms->atomic_modeset = FALSE;
+        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "The use Atomic Mode Setting has "
+                                             "been disabled\n");
+    }
+
 
     ms->kms_has_modifiers = FALSE;
     ret = drmGetCap(ms->fd, DRM_CAP_ADDFB2_MODIFIERS, &value);

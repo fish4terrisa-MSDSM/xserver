@@ -53,6 +53,7 @@ typedef enum {
     OPTION_DOUBLE_SHADOW,
     OPTION_SHADOW_PRIMARY,
     OPTION_TEARFREE,
+    OPTION_NO_ATOMIC,
 } modesettingOpts;
 
 typedef struct
