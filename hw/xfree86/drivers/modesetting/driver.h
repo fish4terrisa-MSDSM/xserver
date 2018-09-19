@@ -52,6 +52,7 @@ typedef enum {
     OPTION_ZAPHOD_HEADS,
     OPTION_DOUBLE_SHADOW,
     OPTION_SHADOW_PRIMARY,
+    OPTION_TEARFREE,
 } modesettingOpts;
 
 typedef struct
@@ -181,4 +182,5 @@ Bool ms_do_pageflip(ScreenPtr screen,
 
 #endif
 
+void ms_do_tearfree_flip(xf86CrtcPtr crtc);
 int ms_flush_drm_events(ScreenPtr screen);
