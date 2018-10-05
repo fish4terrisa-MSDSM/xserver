@@ -1533,8 +1533,8 @@ drmmode_set_mode_major(xf86CrtcPtr crtc, DisplayModePtr mode,
         }
 
         /* if we only tested the mode previously, really set it now */
-        if (can_test)
-            drmmode_crtc_set_mode(crtc, FALSE);
+        if (can_test && drmmode_crtc_set_mode(crtc, FALSE))
+            ret = FALSE;
         ms->pending_modeset = FALSE;
     }
 
