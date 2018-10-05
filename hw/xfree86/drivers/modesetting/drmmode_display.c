@@ -757,6 +757,21 @@ drmmode_crtc_disable(xf86CrtcPtr crtc)
     return ret;
 }
 
+static xf86OutputPtr
+drmmode_target_output(ScrnInfoPtr scrn, xf86CrtcPtr crtc)
+{
+    xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(scrn);
+    int o;
+
+    if (config->output[config->compat_output]->crtc == crtc)
+        return config->output[config->compat_output];
+
+    for (o = 0; o < config->num_output; o++)
+        if (config->output[o]->crtc == crtc)
+            return config->output[o];
+
+    return NULL;
+}
 static int
 drmmode_crtc_set_mode(xf86CrtcPtr crtc, Bool test_only)
 {
@@ -3454,7 +3469,6 @@ drmmode_set_desired_modes(ScrnInfoPtr pScrn, drmmode_ptr drmmode, Bool set_hw)
         xf86CrtcPtr crtc = config->crtc[c];
         drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
         xf86OutputPtr output = NULL;
-        int o;
 
         /* Skip disabled CRTCs */
         if (!crtc->enabled) {
@@ -3465,15 +3479,7 @@ drmmode_set_desired_modes(ScrnInfoPtr pScrn, drmmode_ptr drmmode, Bool set_hw)
             continue;
         }
 
-        if (config->output[config->compat_output]->crtc == crtc)
-            output = config->output[config->compat_output];
-        else {
-            for (o = 0; o < config->num_output; o++)
-                if (config->output[o]->crtc == crtc) {
-                    output = config->output[o];
-                    break;
-                }
-        }
+        output = drmmode_target_output(pScrn, crtc);
         /* paranoia */
         if (!output)
             continue;
