@@ -416,6 +416,13 @@ drmmode_ConvertToKMode(ScrnInfoPtr scrn,
 
 
 static int
+drmmodeatomicaddproperty(drmModeAtomicReqPtr req, uint32_t obj, uint32_t prop, uint64_t value)
+{
+    ErrorF("Adding to %p: %x %x %lx\n", req, obj, prop, value);
+    return drmModeAtomicAddProperty(req, obj, prop, value);
+}
+
+static int
 plane_add_prop(drmModeAtomicReq *req, drmmode_crtc_private_ptr drmmode_crtc,
                enum drmmode_plane_property prop, uint64_t val)
 {
@@ -425,7 +432,8 @@ plane_add_prop(drmModeAtomicReq *req, drmmode_crtc_private_ptr drmmode_crtc,
     if (!info)
         return -1;
 
-    ret = drmModeAtomicAddProperty(req, drmmode_crtc->plane_id,
+    ErrorF("Setting %s\n", info->name);
+    ret = drmmodeatomicaddproperty(req, drmmode_crtc->plane_id,
                                    info->prop_id, val);
     return (ret <= 0) ? -1 : 0;
 }
@@ -467,7 +475,8 @@ crtc_add_prop(drmModeAtomicReq *req, drmmode_crtc_private_ptr drmmode_crtc,
     if (!info)
         return -1;
 
-    ret = drmModeAtomicAddProperty(req, drmmode_crtc->mode_crtc->crtc_id,
+    ErrorF("Setting %s\n", info->name);
+    ret = drmmodeatomicaddproperty(req, drmmode_crtc->mode_crtc->crtc_id,
                                    info->prop_id, val);
     return (ret <= 0) ? -1 : 0;
 }
@@ -482,7 +491,8 @@ connector_add_prop(drmModeAtomicReq *req, drmmode_output_private_ptr drmmode_out
     if (!info)
         return -1;
 
-    ret = drmModeAtomicAddProperty(req, drmmode_output->output_id,
+    ErrorF("Setting %s\n", info->name);
+    ret = drmmodeatomicaddproperty(req, drmmode_output->output_id,
                                    info->prop_id, val);
     return (ret <= 0) ? -1 : 0;
 }
