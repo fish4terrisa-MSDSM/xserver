@@ -3126,12 +3126,10 @@ drmmode_xf86crtc_resize(ScrnInfoPtr scrn, int width, int height)
     int kcpp = (drmmode->kbpp + 7) / 8;
     PixmapPtr ppix = screen->GetScreenPixmap(screen);
     void *new_pixels = NULL;
+    int step = 0;
 
     if (scrn->virtualX == width && scrn->virtualY == height)
         return TRUE;
-
-    xf86DrvMsg(scrn->scrnIndex, X_INFO,
-               "Allocate new frame buffer %dx%d stride\n", width, height);
 
     old_width = scrn->virtualX;
     old_height = scrn->virtualY;
@@ -3140,22 +3138,29 @@ drmmode_xf86crtc_resize(ScrnInfoPtr scrn, int width, int height)
     old_fb_id = drmmode->fb_id;
     drmmode->fb_id = 0;
 
+    step++;
     if (!drmmode_create_bo(drmmode, &drmmode->front_bo,
                            width, height, drmmode->kbpp))
         goto fail;
 
     pitch = drmmode_bo_get_pitch(&drmmode->front_bo);
 
+    xf86DrvMsg(scrn->scrnIndex, X_INFO,
+               "Allocated new framebuffer %dx%d pitch %d\n",
+               width, height, pitch);
+
     scrn->virtualX = width;
     scrn->virtualY = height;
     scrn->displayWidth = pitch / kcpp;
 
+    step++;
     if (!drmmode->gbm) {
         new_pixels = drmmode_map_front_bo(drmmode);
         if (!new_pixels)
             goto fail;
     }
 
+    step++;
     if (drmmode->shadow_enable) {
         uint32_t size = scrn->displayWidth * scrn->virtualY * cpp;
         new_pixels = calloc(1, size);
@@ -3175,9 +3180,11 @@ drmmode_xf86crtc_resize(ScrnInfoPtr scrn, int width, int height)
     screen->ModifyPixmapHeader(ppix, width, height, -1, -1,
                                scrn->displayWidth * cpp, new_pixels);
 
+    step++;
     if (!drmmode_glamor_handle_new_screen_pixmap(drmmode))
         goto fail;
 
+    step++;
     for (i = 0; i < xf86_config->num_crtc; i++) {
         xf86CrtcPtr crtc = xf86_config->crtc[i];
 
@@ -3197,6 +3204,10 @@ drmmode_xf86crtc_resize(ScrnInfoPtr scrn, int width, int height)
     return TRUE;
 
  fail:
+    xf86DrvMsg(scrn->scrnIndex, X_ERROR,
+               "Failed to resize framebuffer to %dx%d (step %d)\n",
+               width, height, step);
+
     drmmode_bo_destroy(drmmode, &drmmode->front_bo);
     drmmode->front_bo = old_front;
     scrn->virtualX = old_width;
