@@ -3184,8 +3184,9 @@ drmmode_xf86crtc_resize(ScrnInfoPtr scrn, int width, int height)
         if (!crtc->enabled)
             continue;
 
-        drmmode_set_mode_major(crtc, &crtc->mode,
-                               crtc->rotation, crtc->x, crtc->y);
+        if (!drmmode_set_mode_major(crtc, &crtc->mode, crtc->rotation,
+                                    crtc->x, crtc->y))
+            goto fail;
     }
 
     if (old_fb_id) {
