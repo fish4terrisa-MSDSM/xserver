@@ -32,4 +32,6 @@ cygrunsrv -S cygserver
 
 meson setup --prefix=$PREFIX -Dxv=false -Dxf86bigfont=true -Ddmx=true -Dxephyr=true -Dxnest=true -Dxvfb=true -Dxwin=true -Dxorg=true -Dhal=false -Dudev=false -Dpciaccess=false -Dint10=false build/
 ninja -C build/ install
-ninja -C build/ test
+if test "$BUILD" != "i686-pc-cygwin"; then
+    ninja -C build/ test
+fi
