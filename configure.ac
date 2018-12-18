@@ -574,6 +574,7 @@ AC_ARG_ENABLE(clientids,      AS_HELP_STRING([--disable-clientids], [Build Xorg 
 AC_ARG_ENABLE(pciaccess, AS_HELP_STRING([--enable-pciaccess], [Build Xorg with pciaccess library (default: enabled)]), [PCI=$enableval], [PCI=yes])
 AC_ARG_ENABLE(linux_acpi, AS_HELP_STRING([--disable-linux-acpi], [Disable building ACPI support on Linux (if available).]), [enable_linux_acpi=$enableval], [enable_linux_acpi=yes])
 AC_ARG_ENABLE(linux_apm, AS_HELP_STRING([--disable-linux-apm], [Disable building APM support on Linux (if available).]), [enable_linux_apm=$enableval], [enable_linux_apm=yes])
+AC_ARG_ENABLE(elogind, AS_HELP_STRING([--enable-elogind], [Build elogind support (default: auto)]), [ELOGIND_LOGIND=$enableval], [ELOGIND_LOGIND=auto])
 AC_ARG_ENABLE(systemd-logind, AS_HELP_STRING([--enable-systemd-logind], [Build systemd-logind support (default: auto)]), [SYSTEMD_LOGIND=$enableval], [SYSTEMD_LOGIND=auto])
 AC_ARG_ENABLE(suid-wrapper, AS_HELP_STRING([--enable-suid-wrapper], [Build suid-root wrapper for legacy driver support on rootless xserver systems (default: no)]), [SUID_WRAPPER=$enableval], [SUID_WRAPPER=no])
 
@@ -897,6 +898,27 @@ if test "x$CONFIG_HAL" = xyes; then
 	NEED_DBUS="yes"
 fi
 AM_CONDITIONAL(CONFIG_HAL, [test "x$CONFIG_HAL" = xyes])
+
+PKG_CHECK_MODULES(ELOGIND, [libelogind >= 209], [HAVE_ELOGIND=yes], [HAVE_ELOGIND=no])
+if test "x$ELOGIND_LOGIND" = xauto; then
+        if test "x$HAVE_DBUS" = xyes -a "x$CONFIG_UDEV" = xyes -a "x$HAVE_ELOGIND" = xyes; then
+                ELOGIND_LOGIND=yes
+        else
+                ELOGIND_LOGIND=no
+        fi
+fi
+if test "x$ELOGIND_LOGIND" = xyes; then
+        if ! test "x$HAVE_DBUS" = xyes; then
+                AC_MSG_ERROR([elogind requested, but D-Bus is not installed.])
+        fi
+        if ! test "x$CONFIG_UDEV" = xyes ; then
+                AC_MSG_ERROR([elogind is only supported in combination with udev configuration.])
+        fi
+
+        AC_DEFINE(ELOGIND_LOGIND, 1, [Enable elogind integration])
+        NEED_DBUS="yes"
+fi
+AM_CONDITIONAL(ELOGIND_LOGIND, [test "x$ELOGIND_LOGIND" = xyes])
 
 if test "x$SYSTEMD_LOGIND" = xauto; then
         if test "x$HAVE_DBUS" = xyes -a "x$CONFIG_UDEV" = xyes ; then
