@@ -418,9 +418,6 @@
 /* Enable systemd-logind integration */
 #undef SYSTEMD_LOGIND 1
 
-/* Enale elogind integration */
-#undef ELOGIND_LOGIND 1
-
 /* Have a monotonic clock from clock_gettime() */
 #undef MONOTONIC_CLOCK
 

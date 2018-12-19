@@ -1001,7 +1001,7 @@ xf86_find_platform_device_by_devnum(int major, int minor)
     return NULL;
 }
 
-#if defined(SYSTEMD_LOGIND) || defined(ELOGIND_LOGIND)
+#ifdef SYSTEMD_LOGIND
 void
 systemd_logind_vtenter(void)
 {

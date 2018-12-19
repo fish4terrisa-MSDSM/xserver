@@ -26,7 +26,7 @@
 #ifndef SYSTEMD_LOGIND_H
 #define SYSTEMD_LOGIND_H
 
-#if defined(SYSTEMD_LOGIND) || defined(ELOGIND_LOGIND)
+#ifdef SYSTEMD_LOGIND
 int systemd_logind_init(void);
 void systemd_logind_fini(void);
 int systemd_logind_take_fd(int major, int minor, const char *path, Bool *paus);
