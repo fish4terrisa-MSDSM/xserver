@@ -575,6 +575,7 @@ AC_ARG_ENABLE(pciaccess, AS_HELP_STRING([--enable-pciaccess], [Build Xorg with p
 AC_ARG_ENABLE(linux_acpi, AS_HELP_STRING([--disable-linux-acpi], [Disable building ACPI support on Linux (if available).]), [enable_linux_acpi=$enableval], [enable_linux_acpi=yes])
 AC_ARG_ENABLE(linux_apm, AS_HELP_STRING([--disable-linux-apm], [Disable building APM support on Linux (if available).]), [enable_linux_apm=$enableval], [enable_linux_apm=yes])
 AC_ARG_ENABLE(systemd-logind, AS_HELP_STRING([--enable-systemd-logind], [Build systemd-logind support (default: auto)]), [SYSTEMD_LOGIND=$enableval], [SYSTEMD_LOGIND=auto])
+AC_ARG_ENABLE(elogind, AS_HELP_STRING([--enable-elogind], [Build elogind support (default: auto)]), [ELOGIND_LOGIND=$enableval], [ELOGIND_LOGIND=auto])
 AC_ARG_ENABLE(suid-wrapper, AS_HELP_STRING([--enable-suid-wrapper], [Build suid-root wrapper for legacy driver support on rootless xserver systems (default: no)]), [SUID_WRAPPER=$enableval], [SUID_WRAPPER=no])
 
 dnl DDXes.
@@ -846,6 +847,15 @@ if test "x$WITH_SYSTEMD_DAEMON" = "xyes" -o "x$WITH_SYSTEMD_DAEMON" = "xauto" ; 
 fi
 AM_CONDITIONAL([HAVE_SYSTEMD_DAEMON], [test "x$HAVE_SYSTEMD_DAEMON" = "xyes"])
 
+dnl elogind socket fds detection for xtrans
+PKG_CHECK_MODULES(ELOGIND, [libelogind >= 209], [HAVE_ELOGIND=yes], [HAVE_ELOGIND=no])
+if test "x$HAVE_ELOGIND" = xyes -a "x$HAVE_SYSTEMD_DAEMON" = xno; then
+        REQUIRED_LIBS="$REQUIRED_LIBS libelogind >= 209"
+else
+        HAVE_ELOGIND="no"
+fi
+AM_CONDITIONAL([HAVE_ELOGIND], [test "x$HAVE_ELOGIND" = "xyes"])
+
 if test "x$CONFIG_UDEV" = xyes && test "x$CONFIG_HAL" = xyes; then
 	AC_MSG_ERROR([Hotplugging through both libudev and hal not allowed])
 fi
@@ -877,6 +887,7 @@ if test "x$CONFIG_UDEV" = xyes; then
 	CFLAGS=$SAVE_CFLAGS
 fi
 AM_CONDITIONAL(CONFIG_UDEV_KMS, [test "x$CONFIG_UDEV_KMS" = xyes])
+
 
 PKG_CHECK_MODULES(DBUS, $LIBDBUS, [HAVE_DBUS=yes], [HAVE_DBUS=no])
 if test "x$HAVE_DBUS" = xyes; then
@@ -917,6 +928,27 @@ if test "x$SYSTEMD_LOGIND" = xyes; then
         NEED_DBUS="yes"
 fi
 AM_CONDITIONAL(SYSTEMD_LOGIND, [test "x$SYSTEMD_LOGIND" = xyes])
+
+dnl Chcek for elogind integration
+if test "x$ELOGIND_LOGIND" = xauto; then
+        if test "x$HAVE_DBUS" = xyes -a "x$CONFIG_UDEV" = xyes -a "x$HAVE_ELOGIND" = xyes -a "x$SYSTEMD_LOGIND" = xno; then
+                ELOGIND_LOGIND=yes
+        else
+                ELOGIND_LOGIND=no
+        fi
+fi
+if test "x$ELOGIND_LOGIND" = xyes; then
+        if ! test "x$HAVE_DBUS" = xyes; then
+                AC_MSG_ERROR([elogind requested, but D-Bus is not installed.])
+        fi
+        if ! test "x$CONFIG_UDEV" = xyes ; then
+                AC_MSG_ERROR([elogind is only supported in combination with udev configuration.])
+        fi
+
+        AC_DEFINE(ELOGIND_LOGIND, 1, [Enable elogind integration])
+        NEED_DBUS="yes"
+fi
+AM_CONDITIONAL(ELOGIND_LOGIND, [test "x$ELOGIND_LOGIND" = xyes])
 
 if test "x$SUID_WRAPPER" = xyes; then
         dnl This is a define so that if some platforms want to put the wrapper

@@ -24,6 +24,11 @@ LOGIND_SRCS = systemd-logind.c
 XORG_CFLAGS += $(DBUS_CFLAGS)
 endif
 
+if ELOGIND_LOGIND
+LOGIND_SRCS = systemd-logind.c
+XORG_CFLAGS += $(DBUS_CFLAGS)
+endif
+
 liblinux_la_SOURCES = linux.h lnx_init.c lnx_video.c \
                      lnx_agp.c lnx_kmod.c lnx_bell.c lnx_platform.c \
 		     $(srcdir)/../shared/VTsw_usl.c \
