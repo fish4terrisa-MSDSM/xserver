@@ -94,6 +94,7 @@ xfont2_dep = dependency('xfont2', version: '>= 2.0')
 nettle_dep = dependency('nettle')
 
 dbus_required = get_option('systemd_logind') == 'true'
+dbus_requried = get_option('elogind') == 'true'
 dbus_dep = dependency('dbus-1', version: '>= 1.0', required: dbus_required)
 
 # libsystemd-daemon was moved into libsystemd in version 209
@@ -155,6 +156,12 @@ if get_option('systemd_logind') == 'auto'
     build_systemd_logind = build_udev and dbus_dep.found()
 else
     build_systemd_logind = get_option('systemd_logind') == 'true'
+endif
+
+if get_option('elogind') == 'auto'
+    build_elogind = build_udev and dbus_dep.found()
+else
+    build_elogind = get_option('elogind') == 'true'
 endif
 
 build_xorg = false
@@ -263,7 +270,7 @@ if build_udev and build_hal
     error('Hotplugging through both libudev and hal not allowed')
 endif
 
-build_dbus = build_hal or build_systemd_logind
+build_dbus = build_hal or build_systemd_logind or build_elogind
 
 udev_dep = dependency('', required:false)
 if build_udev

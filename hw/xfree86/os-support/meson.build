@@ -40,6 +40,10 @@ if host_machine.system() == 'linux'
         srcs_xorg_os_support += 'linux/systemd-logind.c'
     endif
 
+    if build_elogind
+        srcs_xorg_os_support += 'linux/systemd-logind.c'
+    endif
+
     # this is ugly because the code is also
     if build_apm or build_acpi
         srcs_xorg_os_support += 'linux/lnx_apm.c'

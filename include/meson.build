@@ -89,7 +89,7 @@ conf_data.set('HAVE_DBUS', build_dbus)
 conf_data.set('CONFIG_HAL', build_hal)
 conf_data.set('SYSTEMD_LOGIND', build_systemd_logind)
 conf_data.set('ELOGIND_LOGIND', build_systemd_logind)
-conf_data.set('NEED_DBUS', build_systemd_logind or build_hal)
+conf_data.set('NEED_DBUS', build_elogind or build_systemd_logind or build_hal)
 conf_data.set('CONFIG_WSCONS', host_machine.system() == 'openbsd')
 
 conf_data.set('HAVE_XSHMFENCE', xshmfence_dep.found())

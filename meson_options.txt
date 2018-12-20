@@ -66,6 +66,8 @@ option('hal', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable HAL integration')
 option('systemd_logind', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable systemd-logind integration')
+option('elogind', type: 'combo', choices: ['true', 'false, 'auto'], value: 'auto',
+       description: 'Enable elogind integration')
 option('vbe', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Xorg VBE module')
 option('vgahw', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
