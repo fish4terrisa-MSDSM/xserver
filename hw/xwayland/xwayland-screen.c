@@ -104,6 +104,12 @@ xwl_screen_has_resolution_change_emulation(struct xwl_screen *xwl_screen)
     return xwl_screen->rootless && xwl_screen_has_viewport_support(xwl_screen);
 }
 
+int
+xwl_scale_to(struct xwl_screen *xwl_screen, int value)
+{
+    return value / (double)xwl_screen->global_output_scale + 0.5;
+}
+
 /* Return the output @ 0x0, falling back to the first output in the list */
 struct xwl_output *
 xwl_screen_get_first_output(struct xwl_screen *xwl_screen)
@@ -507,6 +513,11 @@ xwl_screen_set_global_scale( struct xwl_screen *xwl_screen, int32_t scale)
 {
     struct xwl_output *it;
     xwl_screen->global_output_scale = scale;
+
+    /* change randr resolutions and positions */
+    xorg_list_for_each_entry(it, &xwl_screen->output_list, link) {
+        xwl_output_apply_changes(it);
+    }
 }
 
 Bool
