@@ -216,6 +216,9 @@ update_screen_size(struct xwl_output *xwl_output, int width, int height)
     struct xwl_screen *xwl_screen = xwl_output->xwl_screen;
     double mmpd;
 
+    width = width * xwl_screen->global_output_scale;
+    height = height * xwl_screen->global_output_scale;
+
     if (xwl_screen->root_clip_mode == ROOT_CLIP_FULL)
         SetRootClip(xwl_screen->screen, ROOT_CLIP_NONE);
 
@@ -534,6 +537,7 @@ apply_output_change(struct xwl_output *xwl_output)
     int width = 0, height = 0, has_this_output = 0;
     RRModePtr *randr_modes;
     Bool need_rotate;
+    int32_t scale = xwl_screen->global_output_scale;
 
     /* Clear out the "done" received flags */
     xwl_output->wl_output_done = FALSE;
@@ -555,7 +559,7 @@ apply_output_change(struct xwl_output *xwl_output)
     randr_modes = output_get_rr_modes(xwl_output, mode_width, mode_height, &count);
     RROutputSetModes(xwl_output->randr_output, randr_modes, count, 1);
     RRCrtcNotify(xwl_output->randr_crtc, randr_modes[0],
-                 xwl_output->x, xwl_output->y,
+                 xwl_output->x * scale, xwl_output->y * scale,
                  xwl_output->rotation, NULL, 1, &xwl_output->randr_output);
     /* RROutputSetModes takes ownership of the passed in modes, so we only
      * have to free the pointer array.
@@ -600,8 +604,39 @@ output_handle_done(void *data, struct wl_output *wl_output)
 }
 
 static void
+output_calc_global_scale( struct xwl_screen *xwl_screen)
+{
+    struct xwl_output *it;
+    int32_t scale = 1;
+
+    if (!xwl_screen->max_factor_rescale)
+        return;
+    if (!xwl_screen->xdg_output_manager)
+        /* multi dpi scaling is only possible when logical sizes are available */
+        return;
+
+    xorg_list_for_each_entry(it, &xwl_screen->output_list, link) {
+        if (it->scale > scale) {
+            scale = it->scale;
+        }
+    }
+    xwl_screen->global_output_scale = scale;
+
+    /* change randr resolutions and positions */
+    xorg_list_for_each_entry(it, &xwl_screen->output_list, link) {
+        apply_output_change(it);
+    }
+}
+
+static void
 output_handle_scale(void *data, struct wl_output *wl_output, int32_t factor)
 {
+    struct xwl_output *xwl_output = data;
+
+    xwl_output->scale = factor;
+
+    /* recalculate global scale */
+    output_calc_global_scale(xwl_output->xwl_screen);
 }
 
 static const struct wl_output_listener output_listener = {
@@ -705,6 +740,8 @@ xwl_output_create(struct xwl_screen *xwl_screen, uint32_t id)
     RRCrtcGammaSetSize(xwl_output->randr_crtc, 256);
     RROutputSetCrtcs(xwl_output->randr_output, &xwl_output->randr_crtc, 1);
     RROutputSetConnection(xwl_output->randr_output, RR_Connected);
+
+    xwl_output->scale = 1;
 
     /* We want the output to be in the list as soon as created so we can
      * use it when binding to the xdg-output protocol...

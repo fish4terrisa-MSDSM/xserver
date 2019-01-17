@@ -89,6 +89,7 @@ ddxUseMsg(void)
     ErrorF("-listenfd fd           add given fd as a listen socket\n");
     ErrorF("-listen fd             deprecated, use \"-listenfd\" instead\n");
     ErrorF("-eglstream             use eglstream backend for nvidia GPUs\n");
+    ErrorF("-max-factor-rescale      multi dpi emulation, requires wm support\n");
 }
 
 static int init_fd = -1;
@@ -146,6 +147,9 @@ ddxProcessArgument(int argc, char *argv[], int i)
         return 1;
     }
     else if (strcmp(argv[i], "-eglstream") == 0) {
+        return 1;
+    }
+    else if (strcmp(argv[i], "-max-factor-rescale") == 0) {
         return 1;
     }
 

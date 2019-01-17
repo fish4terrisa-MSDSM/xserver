@@ -492,7 +492,8 @@ ensure_surface_for_window(WindowPtr window)
         }
 
         wl_region_add(region, 0, 0,
-                      window->drawable.width, window->drawable.height);
+                      xwl_scale_to(xwl_screen, window->drawable.width),
+                      xwl_scale_to(xwl_screen, window->drawable.height));
         wl_surface_set_opaque_region(xwl_window->surface, region);
         wl_region_destroy(region);
     }
@@ -751,6 +752,11 @@ void xwl_surface_damage(struct xwl_screen *xwl_screen,
                         struct wl_surface *surface,
                         int32_t x, int32_t y, int32_t width, int32_t height)
 {
+    x = xwl_scale_to(xwl_screen, x);
+    y = xwl_scale_to(xwl_screen, y);
+    width = xwl_scale_to(xwl_screen, width);
+    height = xwl_scale_to(xwl_screen, height);
+
     if (wl_surface_get_version(surface) >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
         wl_surface_damage_buffer(surface, x, y, width, height);
     else
@@ -785,6 +791,7 @@ xwl_window_post_damage(struct xwl_window *xwl_window)
         xwl_glamor_post_damage(xwl_window, pixmap, region);
 #endif
 
+    wl_surface_set_buffer_scale(xwl_window->surface, xwl_screen->global_output_scale);
     wl_surface_attach(xwl_window->surface, buffer, 0, 0);
 
     /* Arbitrary limit to try to avoid flooding the Wayland

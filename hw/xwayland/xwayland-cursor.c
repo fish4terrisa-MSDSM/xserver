@@ -138,6 +138,7 @@ static const struct wl_callback_listener frame_listener = {
 void
 xwl_seat_set_cursor(struct xwl_seat *xwl_seat)
 {
+    struct xwl_screen *xwl_screen = xwl_seat->xwl_screen;
     struct xwl_cursor *xwl_cursor = &xwl_seat->cursor;
     PixmapPtr pixmap;
     CursorPtr cursor;
@@ -174,8 +175,8 @@ xwl_seat_set_cursor(struct xwl_seat *xwl_seat)
     wl_pointer_set_cursor(xwl_seat->wl_pointer,
                           xwl_seat->pointer_enter_serial,
                           xwl_cursor->surface,
-                          xwl_seat->x_cursor->bits->xhot,
-                          xwl_seat->x_cursor->bits->yhot);
+                          xwl_scale_to(xwl_screen, xwl_seat->x_cursor->bits->xhot),
+                          xwl_scale_to(xwl_screen, xwl_seat->x_cursor->bits->yhot));
     wl_surface_attach(xwl_cursor->surface,
                       xwl_shm_pixmap_get_wl_buffer(pixmap), 0, 0);
     xwl_surface_damage(xwl_seat->xwl_screen, xwl_cursor->surface, 0, 0,
@@ -192,6 +193,7 @@ void
 xwl_tablet_tool_set_cursor(struct xwl_tablet_tool *xwl_tablet_tool)
 {
     struct xwl_seat *xwl_seat = xwl_tablet_tool->seat;
+    struct xwl_screen *xwl_screen = xwl_seat->xwl_screen;
     struct xwl_cursor *xwl_cursor = &xwl_tablet_tool->cursor;
     PixmapPtr pixmap;
     CursorPtr cursor;
@@ -226,8 +228,8 @@ xwl_tablet_tool_set_cursor(struct xwl_tablet_tool *xwl_tablet_tool)
     zwp_tablet_tool_v2_set_cursor(xwl_tablet_tool->tool,
                                   xwl_tablet_tool->proximity_in_serial,
                                   xwl_cursor->surface,
-                                  xwl_seat->x_cursor->bits->xhot,
-                                  xwl_seat->x_cursor->bits->yhot);
+                                  xwl_scale_to(xwl_screen, xwl_seat->x_cursor->bits->xhot),
+                                  xwl_scale_to(xwl_screen, xwl_seat->x_cursor->bits->yhot));
     wl_surface_attach(xwl_cursor->surface,
                       xwl_shm_pixmap_get_wl_buffer(pixmap), 0, 0);
     xwl_surface_damage(xwl_seat->xwl_screen, xwl_cursor->surface, 0, 0,

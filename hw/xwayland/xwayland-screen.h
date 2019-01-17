@@ -54,6 +54,7 @@ struct xwl_screen {
     int rootless;
     int glamor;
     int present;
+    int max_factor_rescale;
 
     CreateScreenResourcesProcPtr CreateScreenResources;
     CloseScreenProcPtr CloseScreen;
@@ -68,6 +69,8 @@ struct xwl_screen {
     struct xorg_list seat_list;
     struct xorg_list damage_window_list;
     struct xorg_list window_list;
+
+    int32_t global_output_scale;
 
     int wayland_fd;
     struct wl_display *display;
@@ -126,5 +129,6 @@ void xwl_sync_events (struct xwl_screen *xwl_screen);
 void xwl_surface_damage(struct xwl_screen *xwl_screen,
                         struct wl_surface *surface,
                         int32_t x, int32_t y, int32_t width, int32_t height);
+int xwl_scale_to(struct xwl_screen *xwl_screen, int value);
 
 #endif /* XWAYLAND_SCREEN_H */
