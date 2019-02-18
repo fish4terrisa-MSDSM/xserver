@@ -1207,7 +1207,6 @@ shm_tmpfile(void)
 #ifdef HAVE_MEMFD_CREATE
     fd = memfd_create("xorg", MFD_CLOEXEC|MFD_ALLOW_SEALING);
     if (fd != -1) {
-        fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
         DebugF ("Using memfd_create\n");
         return fd;
     }
@@ -1274,6 +1273,9 @@ ProcShmCreateSegment(ClientPtr client)
         close(fd);
         return BadAlloc;
     }
+#if defined(F_ADD_SEALS) && defined(F_SEAL_SHRINK)
+    fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
+#endif
     shmdesc = malloc(sizeof(ShmDescRec));
     if (!shmdesc) {
         close(fd);
