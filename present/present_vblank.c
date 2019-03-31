@@ -42,6 +42,54 @@ present_vblank_notify(present_vblank_ptr vblank, CARD8 kind, CARD8 mode, uint64_
     }
 }
 
+/* Configures the vblank to do a synced or async flip if possible.
+ * Returns the corrected target msc (that might be one less than the
+ * original target msc to compensate for a synced flip).
+ */
+static uint64_t
+present_vblank_configure_flip(present_vblank_ptr vblank,
+                              uint32_t options,
+                              const uint32_t *capabilities,
+                              uint64_t crtc_msc)
+{
+    present_screen_priv_ptr screen_priv = present_screen_priv(vblank->screen);
+
+    /* default values */
+    vblank->flip = FALSE;
+    vblank->sync_flip = FALSE;
+    vblank->reason = PRESENT_FLIP_REASON_UNKNOWN;
+
+    if (!vblank->pixmap || (options & PresentOptionCopy) || !capabilities)
+        return vblank->target_msc;
+
+    if (msc_is_after(vblank->target_msc, crtc_msc)) {
+        /* check if synced flip is possible */
+        Bool can_sync_flip = screen_priv->check_flip(vblank->crtc,
+                                                     vblank->window,
+                                                     vblank->pixmap,
+                                                     TRUE,
+                                                     vblank->valid,
+                                                     vblank->x_off, vblank->y_off,
+                                                     &vblank->reason);
+        if (can_sync_flip) {
+            vblank->flip = TRUE;
+            vblank->sync_flip = TRUE;
+            return vblank->target_msc - 1;
+        }
+    }
+    if ((*capabilities & PresentCapabilityAsync)) {
+        /* check if async flip is possible */
+        vblank->flip = screen_priv->check_flip(vblank->crtc,
+                                               vblank->window,
+                                               vblank->pixmap,
+                                               FALSE,
+                                               vblank->valid,
+                                               vblank->x_off, vblank->y_off,
+                                               &vblank->reason);
+    }
+    return vblank->target_msc;
+}
+
 present_vblank_ptr
 present_vblank_create(WindowPtr window,
                       PixmapPtr pixmap,
@@ -64,7 +112,6 @@ present_vblank_create(WindowPtr window,
     present_window_priv_ptr     window_priv = present_get_window_priv(window, TRUE);
     present_screen_priv_ptr     screen_priv = present_screen_priv(screen);
     present_vblank_ptr          vblank;
-    PresentFlipReason           reason = PRESENT_FLIP_REASON_UNKNOWN;
 
     vblank = calloc (1, sizeof (present_vblank_rec));
     if (!vblank)
@@ -108,22 +155,7 @@ present_vblank_create(WindowPtr window,
     vblank->has_suboptimal = (options & PresentOptionSuboptimal);
     vblank->flip_idler = FALSE;
 
-    if (pixmap != NULL &&
-        !(options & PresentOptionCopy) &&
-        capabilities) {
-        if (msc_is_after(*target_msc, crtc_msc) &&
-            screen_priv->check_flip (target_crtc, window, pixmap, TRUE, valid, x_off, y_off, &reason))
-        {
-            vblank->flip = TRUE;
-            vblank->sync_flip = TRUE;
-            *target_msc = *target_msc - 1;
-        } else if ((*capabilities & PresentCapabilityAsync) &&
-            screen_priv->check_flip (target_crtc, window, pixmap, FALSE, valid, x_off, y_off, &reason))
-        {
-            vblank->flip = TRUE;
-        }
-    }
-    vblank->reason = reason;
+    *target_msc = present_vblank_configure_flip(vblank, options, capabilities, crtc_msc);
 
     if (wait_fence) {
         vblank->wait_fence = present_fence_create(wait_fence);
