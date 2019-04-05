@@ -48,36 +48,68 @@ initialization, when the InitInput routine is called.
 
 ### Summary of Calling Sequence
 
-Device-Independent X | Device-Dependent X -------------------- |
-------------------- | InitInput --------------\> | - do device-specific
-initialization | | - call AddInputDevice (deviceProc,AutoStart)
-AddInputDevice | - creates DeviceIntRec | - records deviceProc | - adds
-new device to | list of off\_devices. | sets dev-\>startup=AutoStart| |
-- call one of: | - RegisterPointerDevice (X pointer) | -
-processInputProc = ProcessPointerEvents | - RegisterKeyboardDevice (X
-keyboard) | - processInputProc = ProcessKeyboardEvents | -
-RegisterOtherDevice (extension device) | - processInputProc =
-ProcessOtherEvents | | InitAndStartDevices -----\> | - calls deviceProc
-with parameters | (DEVICE\_INIT, AutoStart) sets dev-\>inited = return |
-value from deviceProc | | | - in deviceProc, do one of: | - call
-InitPointerDeviceStruct (X pointer) | - call InitKeyboardDeviceStruct (X
-keybd) | - init extension device by calling some of: | -
-InitKeyClassDeviceStruct | - InitButtonClassDeviceStruct | -
-InitValuatorClassDeviceStruct | - InitValuatorAxisStruct | -
-InitFocusClassDeviceStruct | - InitProximityClassDeviceStruct | -
-InitKbdFeedbackClassDeviceStruct | - InitPtrFeedbackClassDeviceStruct |
-- InitLedFeedbackClassDeviceStruct | -
-InitStringFeedbackClassDeviceStruct | -
-InitIntegerFeedbackClassDeviceStruct | -
-InitBellFeedbackClassDeviceStruct | - init device name and type by: | -
-calling MakeAtom with one of the | predefined names | - calling
-AssignTypeAndName | | for each device added | by AddInputDevice, |
-InitAndStartDevices | calls EnableDevice if | - EnableDevice calls
-deviceProc with dev-\>startup & | (DEVICE\_ON, AutoStart) dev-\>inited |
-| If deviceProc returns | - core devices are now enabled, extension
-Success, EnableDevice | devices are now available to be accessed move
-the device from | through the input extension protocol
-inputInfo.off\_devices | requests. to inputInfo.devices |
+```
+Device-Independent X       |  Device-Dependent X
+--------------------       |  -------------------
+                           |
+InitInput -------------->  |  - do device-specific initialization
+                           |
+                           |  - call AddInputDevice  (deviceProc,AutoStart)
+AddInputDevice             |
+  - creates DeviceIntRec   |
+  - records deviceProc     |
+  - adds new device to     |
+    list of off_devices.   |
+sets dev->startup=AutoStart|
+                           |  - call one of:
+                           |    - RegisterPointerDevice (X pointer)
+                           |      - processInputProc = ProcessPointerEvents
+                           |    - RegisterKeyboardDevice (X keyboard)
+                           |      - processInputProc = ProcessKeyboardEvents
+                           |    - RegisterOtherDevice  (extension device)
+                           |      - processInputProc = ProcessOtherEvents
+                           |
+                           |
+InitAndStartDevices -----> |  - calls deviceProc with parameters
+                           |    (DEVICE_INIT, AutoStart)
+sets dev->inited = return  |
+  value from deviceProc    |
+                           |
+                           |  - in deviceProc, do one of:
+                           |    - call InitPointerDeviceStruct (X pointer)
+                           |    - call InitKeyboardDeviceStruct (X keybd)
+                           |    - init extension device by calling some of:
+                           |      - InitKeyClassDeviceStruct
+                           |      - InitButtonClassDeviceStruct
+                           |      - InitValuatorClassDeviceStruct
+                           |      - InitValuatorAxisStruct
+                           |      - InitFocusClassDeviceStruct
+                           |      - InitProximityClassDeviceStruct
+                           |      - InitKbdFeedbackClassDeviceStruct
+                           |      - InitPtrFeedbackClassDeviceStruct
+                           |      - InitLedFeedbackClassDeviceStruct
+                           |      - InitStringFeedbackClassDeviceStruct
+                           |      - InitIntegerFeedbackClassDeviceStruct
+                           |      - InitBellFeedbackClassDeviceStruct
+                           |    - init device name and type by:
+                           |      - calling MakeAtom with one of the
+                           |        predefined names
+                           |      - calling AssignTypeAndName
+                           |
+                           |
+for each device added      |
+    by AddInputDevice,     |
+    InitAndStartDevices    |
+    calls EnableDevice if  |  - EnableDevice calls deviceProc with
+    dev->startup &         |    (DEVICE_ON, AutoStart)
+    dev->inited            |
+                           |
+If deviceProc returns      |  - core devices are now enabled, extension
+    Success, EnableDevice  |    devices are now available to be accessed
+    move the device from   |    through the input extension protocol
+    inputInfo.off_devices  |    requests.
+    to inputInfo.devices   |
+```
 
 ### Initialization Called From InitInput
 
@@ -102,24 +134,48 @@ AddInputDevice.
 
 A sample InitInput implementation is shown below.
 
-InitInput(argc,argv) { int i, numdevs; DeviceIntPtr dev; LocalDevice
-localdevs\[LOCAL\_MAX\_DEVS\]; DeviceProc kbdproc, ptrproc, extproc;
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
-\* Open the appropriate input devices, determine which are \* available,
-and choose an X pointer and X keyboard device \* in some
-implementation-dependent manner.
-\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-open\_input\_devices (\&numdevs, localdevs);
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
-\* Register the input devices with DIX.
-\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-for (i=0; i\<numdevs; i++) { if (localdevs\[i\].use == IsXKeyboard) {
-dev = AddInputDevice (kbdproc, TRUE); RegisterKeyboardDevice (dev); }
-else if (localdevs\[i\].use == IsXPointer) { dev = AddInputDevice
-(ptrproc, TRUE); RegisterPointerDevice (dev); } else { dev =
-AddInputDevice (extproc, FALSE); RegisterOtherDevice (dev); } if (dev ==
-NULL) FatalError ("Too many input devices."); dev-\>devicePrivate =
-(pointer) \&localdevs\[i\]; }
+```
+InitInput(argc,argv)
+    {
+    int i, numdevs;
+    DeviceIntPtr dev;
+    LocalDevice localdevs[LOCAL_MAX_DEVS];
+    DeviceProc kbdproc, ptrproc, extproc;
+
+    /**************************************************************
+     * Open the appropriate input devices, determine which are
+     * available, and choose an X pointer and X keyboard device
+     * in some implementation-dependent manner.
+     ***************************************************************/
+
+    open_input_devices (&numdevs, localdevs);
+
+    /**************************************************************
+     * Register the input devices with DIX.
+     ***************************************************************/
+
+    for (i=0; i<numdevs; i++)
+        {
+        if (localdevs[i].use == IsXKeyboard)
+            {
+            dev = AddInputDevice (kbdproc, TRUE);
+            RegisterKeyboardDevice (dev);
+            }
+        else if (localdevs[i].use == IsXPointer)
+            {
+            dev = AddInputDevice (ptrproc, TRUE);
+            RegisterPointerDevice (dev);
+            }
+        else
+            {
+            dev = AddInputDevice (extproc, FALSE);
+            RegisterOtherDevice (dev);
+            }
+        if (dev == NULL)
+            FatalError ("Too many input devices.");
+        dev->devicePrivate = (pointer) &localdevs[i];
+        }
+```
 
 ### Initialization Called From InitAndStartDevices
 
@@ -139,39 +195,76 @@ and are described in the following sections.
 A sample device control routine called from InitAndStartDevices is shown
 below.
 
-Bool extproc (dev, mode) DeviceIntPtr dev; int mode; { LocalDevice
-\*localdev = (LocalDevice \*) dev-\>devicePrivate; switch (mode) { case
-DEVICE\_INIT: if (strcmp(localdev-\>name, XI\_TABLET) == 0) {
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
-\* This device reports proximity, has buttons, \* reports two axes of
-motion, and can be focused. \* It also supports the same feedbacks as
-the X pointer \* (acceleration and threshold can be set).
-\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-InitButtonClassDeviceStruct (dev, button\_count, button\_map);
-InitValuatorClassDeviceStruct (dev, localdev-\>n\_axes,); motionproc,
-MOTION\_BUF\_SIZE, Absolute); for (i=0; i\<localdev-\>n\_axes; i++)
-InitValuatorAxisStruct (dev, i, min\_val, max\_val, resolution);
-InitFocusClassDeviceStruct (dev); InitProximityClassDeviceStruct (dev);
-InitPtrFeedbackClassDeviceStruct (dev, p\_controlproc); } else if
-(strcmp(localdev-\>name, XI\_BUTTONBOX) == 0) {
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
-\* This device has keys and LEDs, and can be focused.
-\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-InitKeyClassDeviceStruct (dev, syms, modmap); InitFocusClassDeviceStruct
-(dev); InitLedFeedbackClassDeviceStruct (dev, ledcontrol); } else if
-(strcmp(localdev-\>name, XI\_KNOBBOX) == 0) {
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
-\* This device reports motion. \* It can be focused.
-\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-InitValuatorClassDeviceStruct (dev, localdev-\>n\_axes,); motionproc,
-MOTION\_BUF\_SIZE, Absolute); for (i=0; i\<localdev-\>n\_axes; i++)
-InitValuatorAxisStruct (dev, i, min\_val, max\_val, resolution);
-InitFocusClassDeviceStruct (dev); } localdev-\>atom =
-MakeAtom(localdev-\>name, strlen(localdev-\>name), FALSE);
-AssignTypeAndName (dev, localdev-\>atom, localdev-\>name); break; case
-DEVICE\_ON: AddEnabledDevice (localdev-\>file\_ds); dev-\>on = TRUE;
-break; case DEVICE\_OFF: dev-\>on = FALSE; RemoveEnabledDevice
-(localdev-\>file\_ds); break; case DEVICE\_CLOSE: break; } }
+```
+Bool extproc (dev, mode)
+    DeviceIntPtr dev;
+    int mode;
+    {
+    LocalDevice *localdev = (LocalDevice *) dev->devicePrivate;
+
+    switch (mode)
+        {
+        case DEVICE_INIT:
+            if (strcmp(localdev->name, XI_TABLET) == 0)
+                {
+                /****************************************************
+                 * This device reports proximity, has buttons,
+                 * reports two axes of motion, and can be focused.
+                 * It also supports the same feedbacks as the X pointer
+                 * (acceleration and threshold can be set).
+                 ****************************************************/
+
+                InitButtonClassDeviceStruct (dev, button_count, button_map);
+                InitValuatorClassDeviceStruct (dev, localdev->n_axes,);
+                    motionproc, MOTION_BUF_SIZE, Absolute);
+                for (i=0; i<localdev->n_axes; i++)
+                    InitValuatorAxisStruct (dev, i, min_val, max_val,
+                        resolution);
+                InitFocusClassDeviceStruct (dev);
+                InitProximityClassDeviceStruct (dev);
+                InitPtrFeedbackClassDeviceStruct (dev, p_controlproc);
+                }
+            else if (strcmp(localdev->name, XI_BUTTONBOX) == 0)
+                {
+                /****************************************************
+                 * This device has keys and LEDs, and can be focused.
+                 ****************************************************/
+
+                InitKeyClassDeviceStruct (dev, syms, modmap);
+                InitFocusClassDeviceStruct (dev);
+                InitLedFeedbackClassDeviceStruct (dev, ledcontrol);
+                }
+            else if (strcmp(localdev->name, XI_KNOBBOX) == 0)
+                {
+                /****************************************************
+                 * This device reports motion.
+                 * It can be focused.
+                 ****************************************************/
+
+                InitValuatorClassDeviceStruct (dev, localdev->n_axes,);
+                    motionproc, MOTION_BUF_SIZE, Absolute);
+                for (i=0; i<localdev->n_axes; i++)
+                    InitValuatorAxisStruct (dev, i, min_val, max_val,
+                        resolution);
+                InitFocusClassDeviceStruct (dev);
+                }
+            localdev->atom =
+                MakeAtom(localdev->name, strlen(localdev->name), FALSE);
+            AssignTypeAndName (dev, localdev->atom, localdev->name);
+            break;
+        case DEVICE_ON:
+            AddEnabledDevice (localdev->file_ds);
+            dev->on = TRUE;
+            break;
+        case DEVICE_OFF:
+            dev->on = FALSE;
+            RemoveEnabledDevice (localdev->file_ds);
+            break;
+        case DEVICE_CLOSE:
+            break;
+        }
+    }
+```
 
 The device control routine is called with a mode value of DEVICE\_ON by
 the DIX routine EnableDevice, which is called from InitAndStartDevices.
@@ -438,12 +531,26 @@ that have been initialized, AddOtherInputDevices is called to give DDX a
 chance to initialize any previously unavailable input devices.
 
 A sample AddOtherInputDevices routine might look like the following:
-void AddOtherInputDevices () { DeviceIntPtr dev; int i; for (i=0;
-i\<MAX\_DEVICES; i++) { if (\!local\_dev\[i\].initialized &&
-available(local\_dev\[i\])) { dev = (DeviceIntPtr) AddInputDevice
-(local\_dev\[i\].deviceProc, TRUE); dev-\>public.devicePrivate =
-local\_dev\[i\]; RegisterOtherDevice (dev); dev-\>inited =
-((\*dev-\>deviceProc)(dev, DEVICE\_INIT) == Success); } } }
+
+```
+void
+AddOtherInputDevices ()
+    {
+    DeviceIntPtr dev;
+    int i;
+
+    for (i=0; i<MAX_DEVICES; i++)
+        {
+        if (!local_dev[i].initialized && available(local_dev[i]))
+            {
+            dev = (DeviceIntPtr) AddInputDevice (local_dev[i].deviceProc, TRUE);
+            dev->public.devicePrivate = local_dev[i];
+            RegisterOtherDevice (dev);
+            dev->inited = ((*dev-?deviceProc)(dev, DEVICE_INIT) == Success);
+            }
+        }
+    }
+```
 
 The default AddOtherInputDevices routine in xstubs.c does nothing. If
 all input extension devices are initialized when the server starts up,
@@ -597,28 +704,43 @@ type of `DeviceKeyPress`, and the second has an event type of
 The following code fragment shows how the two wire events could be
 initialized:
 
-extern int DeviceKeyPress; DeviceIntPtr dev; xEvent xE\[2\]; CARD8 id,
-num\_valuators; INT16 x, y, pointerx, pointery; Time timestamp;
-deviceKeyButtonPointer \*xev = (deviceKeyButtonPointer \*) xE;
-deviceValuator \*xv; xev-\>type = DeviceKeyPress; /\* defined by input
-extension \*/ xev-\>detail = keycode; /\* key pressed on this device \*/
-xev-\>time = timestamp; /\* same as for core events \*/ xev-\>rootX =
-pointerx; /\* x location of core pointer \*/ xev-\>rootY = pointery; /\*
-y location of core pointer \*/
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-/\* \*/ /\* The following field does not exist for core input events.
-\*/ /\* It contains the device id for the device that generated the \*/
-/\* event, and also indicates whether more than one 32-byte wire \*/ /\*
-event is being sent. \*/ /\* \*/
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-xev-\>deviceid = dev-\>id | MORE\_EVENTS; /\* sending more than 1 \*/
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-/\* Fields in the second 32-byte wire event: \*/
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-xv = (deviceValuator \*) ++xev; xv-\>type = DeviceValuator; /\* event
-type of second event \*/ xv-\>deviceid = dev-\>id; /\* id of this device
-\*/ xv-\>num\_valuators = 0; /\* no valuators being sent \*/
-xv-\>device\_state = 0; /\* will be filled in by DIX \*/
+```
+    extern int DeviceKeyPress;
+    DeviceIntPtr dev;
+    xEvent xE[2];
+    CARD8 id, num_valuators;
+    INT16 x, y, pointerx, pointery;
+    Time timestamp;
+    deviceKeyButtonPointer *xev = (deviceKeyButtonPointer *) xE;
+    deviceValuator *xv;
+
+    xev->type = DeviceKeyPress;         /* defined by input extension */
+    xev->detail = keycode;              /* key pressed on this device */
+    xev->time = timestamp;              /* same as for core events    */
+    xev->rootX = pointerx;              /* x location of core pointer */
+    xev->rootY = pointery;              /* y location of core pointer */
+
+    /******************************************************************/
+    /*                                                                */
+    /* The following field does not exist for core input events.      */
+    /* It contains the device id for the device that generated the    */
+    /* event, and also indicates whether more than one 32-byte wire   */
+    /* event is being sent.                                           */
+    /*                                                                */
+    /******************************************************************/
+
+    xev->deviceid = dev->id | MORE_EVENTS;     /* sending more than 1 */
+
+    /******************************************************************/
+    /* Fields in the second 32-byte wire event:                       */
+    /******************************************************************/
+
+    xv = (deviceValuator *) ++xev;
+    xv->type = DeviceValuator;          /* event type of second event */
+    xv->deviceid = dev->id;             /* id of this device          */
+    xv->num_valuators = 0;              /* no valuators being sent    */
+    xv->device_state  = 0;              /* will be filled in by DIX   */
+```
 
 ### Device Button Events
 
@@ -633,31 +755,46 @@ core motion event, and also additional valuator information. At least
 two wire events are required to contain this information. The following
 code fragment shows how the two wire events could be initialized:
 
-extern int DeviceMotionNotify; DeviceIntPtr dev; xEvent xE\[2\]; CARD8
-id, num\_valuators; INT16 x, y, pointerx, pointery; Time timestamp;
-deviceKeyButtonPointer \*xev = (deviceKeyButtonPointer \*) xE;
-deviceValuator \*xv; xev-\>type = DeviceMotionNotify; /\* defined by
-input extension \*/ xev-\>detail = keycode; /\* key pressed on this
-device \*/ xev-\>time = timestamp; /\* same as for core events \*/
-xev-\>rootX = pointerx; /\* x location of core pointer \*/ xev-\>rootY =
-pointery; /\* y location of core pointer \*/
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-/\* \*/ /\* The following field does not exist for core input events.
-\*/ /\* It contains the device id for the device that generated the \*/
-/\* event, and also indicates whether more than one 32-byte wire \*/ /\*
-event is being sent. \*/ /\* \*/
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-xev-\>deviceid = dev-\>id | MORE\_EVENTS; /\* sending more than 1 \*/
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-/\* Fields in the second 32-byte wire event: \*/
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-xv = (deviceValuator \*) ++xev; xv-\>type = DeviceValuator; /\* event
-type of second event \*/ xv-\>deviceid = dev-\>id; /\* id of this device
-\*/ xv-\>num\_valuators = 2; /\* 2 valuators being sent \*/
-xv-\>first\_valuator = 0; /\* first valuator being sent \*/
-xv-\>device\_state = 0; /\* will be filled in by DIX \*/ xv-\>valuator0
-= x; /\* first axis of this device \*/ xv-\>valuator1 = y; /\* second
-axis of this device \*/
+```
+    extern int DeviceMotionNotify;
+    DeviceIntPtr dev;
+    xEvent xE[2];
+    CARD8 id, num_valuators;
+    INT16 x, y, pointerx, pointery;
+    Time timestamp;
+    deviceKeyButtonPointer *xev = (deviceKeyButtonPointer *) xE;
+    deviceValuator *xv;
+
+    xev->type = DeviceMotionNotify;     /* defined by input extension */
+    xev->detail = keycode;              /* key pressed on this device */
+    xev->time = timestamp;              /* same as for core events    */
+    xev->rootX = pointerx;              /* x location of core pointer */
+    xev->rootY = pointery;              /* y location of core pointer */
+
+    /******************************************************************/
+    /*                                                                */
+    /* The following field does not exist for core input events.      */
+    /* It contains the device id for the device that generated the    */
+    /* event, and also indicates whether more than one 32-byte wire   */
+    /* event is being sent.                                           */
+    /*                                                                */
+    /******************************************************************/
+
+    xev->deviceid = dev->id | MORE_EVENTS;     /* sending more than 1 */
+
+    /******************************************************************/
+    /* Fields in the second 32-byte wire event:                       */
+    /******************************************************************/
+
+    xv = (deviceValuator *) ++xev;
+    xv->type = DeviceValuator;          /* event type of second event */
+    xv->deviceid = dev->id;             /* id of this device          */
+    xv->num_valuators = 2;              /* 2 valuators being sent     */
+    xv->first_valuator = 0;             /* first valuator being sent  */
+    xv->device_state  = 0;              /* will be filled in by DIX   */
+    xv->valuator0 = x;                  /* first axis of this device  */
+    xv->valuator1 = y;                  /* second axis of this device */
+```
 
 Up to six axes can be reported in the deviceValuator event. If the
 device is reporting more than 6 axes, additional pairs of
