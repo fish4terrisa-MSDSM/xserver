@@ -27,6 +27,8 @@ apt-get install -y \
 
 apt-get build-dep -y xorg-server
 
+pip3 install hotdoc
+
 cd /root
 
 git clone https://gitlab.freedesktop.org/mesa/piglit.git --depth 1
