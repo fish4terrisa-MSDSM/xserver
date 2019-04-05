@@ -1,0 +1,7 @@
+index.md
+	Xserver-spec.md
+	hw/xfree86/doc/ddxDesign.md
+	Xinput.md
+	hw/dmx/doc/dmx.md
+	hw/dmx/doc/scaled.md
+	dtrace/Xserver-DTrace.md

@@ -4,7 +4,7 @@ project('xserver', 'c',
             'c_std=gnu99',
         ],
         version: '1.20.99.1',
-        meson_version: '>= 0.46.0',
+        meson_version: '>= 0.48.0',
 )
 add_project_arguments('-DHAVE_DIX_CONFIG_H', language: ['c', 'objc'])
 cc = meson.get_compiler('c')
@@ -13,6 +13,8 @@ add_global_arguments('-fno-strict-aliasing', language : 'c')
 add_global_arguments('-fvisibility=hidden', language : 'c')
 
 add_global_link_arguments('-fvisibility=hidden', language : 'c')
+
+hotdoc = import('hotdoc')
 
 if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
     test_wflags = [
@@ -812,3 +814,11 @@ endif
 
 install_data('xorg-server.m4',
              install_dir: join_paths(get_option('datadir'), 'aclocal'))
+
+hotdoc.generate_doc(
+    'xserver',
+    project_version: meson.project_version(),
+    sitemap: 'doc/sitemap.txt',
+    index: 'doc/index.md',
+    install: true,
+)
