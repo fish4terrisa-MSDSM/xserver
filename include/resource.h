@@ -88,16 +88,15 @@ typedef uint32_t RESTYPE;
 extern _X_EXPORT unsigned int ResourceClientBits(void);
 /* bits and fields within a resource id */
 #define RESOURCE_AND_CLIENT_COUNT   29  /* 29 bits for XIDs */
-#define RESOURCE_CLIENT_BITS        ResourceClientBits() /* client field offset */
-#define CLIENTOFFSET	    (RESOURCE_AND_CLIENT_COUNT - RESOURCE_CLIENT_BITS)
+extern _X_EXPORT unsigned int ClientOffset;
 /* resource field */
-#define RESOURCE_ID_MASK	((1 << CLIENTOFFSET) - 1)
+extern _X_EXPORT unsigned int ResourceIdMask;
 /* client field */
-#define RESOURCE_CLIENT_MASK	(((1 << RESOURCE_CLIENT_BITS) - 1) << CLIENTOFFSET)
+extern _X_EXPORT unsigned int ResourceClientMask;
 /* extract the client mask from an XID */
-#define CLIENT_BITS(id) ((id) & RESOURCE_CLIENT_MASK)
+#define CLIENT_BITS(id) ((id) & ResourceClientMask)
 /* extract the client id from an XID */
-#define CLIENT_ID(id) ((int)(CLIENT_BITS(id) >> CLIENTOFFSET))
+#define CLIENT_ID(id) ((int)(CLIENT_BITS(id) >> ClientOffset))
 #define SERVER_BIT		(Mask)0x40000000        /* use illegal bit */
 
 #ifdef INVALID
