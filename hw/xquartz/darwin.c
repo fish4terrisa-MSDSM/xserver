@@ -525,7 +525,11 @@ InitInput(int argc, char **argv)
     result = AllocDevicePair(serverClient, "xquartz virtual",
                              &darwinPointer, &darwinKeyboard,
                              DarwinMouseProc, DarwinKeybdProc, FALSE);
-    assert(result == Success);
+    if (result != Success) {
+        FatalError("InitInput: AllocDevicePair (...,\"xquartz virtual\",...) "
+                   "returned X windows error %d.\n",
+                   result);
+    }
 
     /* here's the snippet from the current gdk sources:
        if (!strcmp (tmp_name, "pointer"))
@@ -542,15 +546,26 @@ InitInput(int argc, char **argv)
      */
 
     darwinTabletStylus = AddInputDevice(serverClient, DarwinTabletProc, TRUE);
-    assert(darwinTabletStylus);
+    if (!darwinTabletStylus) {
+        FatalError("InitInput: "
+                   "AddInputDevice(serverClient, DarwinTabletProc, TRUE) "
+                   "failed.\n");
+    }
+
     darwinTabletStylus->name = strdup("pen");
 
     darwinTabletCursor = AddInputDevice(serverClient, DarwinTabletProc, TRUE);
-    assert(darwinTabletCursor);
+    if(!darwinTabletCursor) {
+        FatalError("InitInput: "
+                   "AddInputDevice(serverClient, DarwinTabletProc, TRUE) "
+                   "failed.\n");
+    }
     darwinTabletCursor->name = strdup("cursor");
 
     darwinTabletEraser = AddInputDevice(serverClient, DarwinTabletProc, TRUE);
-    assert(darwinTabletEraser);
+    if(!darwinTabletEraser) {
+        FatalError("InitInput: AddInputDevice(serverClient, DarwinTabletProc, TRUE) failed.\n");
+    }
     darwinTabletEraser->name = strdup("eraser");
 
     DarwinEQInit();
@@ -681,10 +696,16 @@ OsVendorInit(void)
         char *home = getenv("HOME");
         int nbytes;
 
-        assert(home);
+        if (!home) {
+            FatalError("darwin OsVendorInit: "
+                       "getenv(\"HOME\") returned NULL.\n");
+        }
 
         nbytes = asprintf(&lf, "%s/Library/Logs/X11", home);
-        assert(nbytes > 0);
+        if (nbytes <= 0) {
+            FatalError("darwin OsVendorInit: "
+                       "asprintf of log directory name failed.\n");
+        }
 
         /* Ignore errors.  If EEXIST, we don't care.  If anything else,
          * LogInit will handle it for us.
@@ -694,7 +715,10 @@ OsVendorInit(void)
 
         nbytes = asprintf(&lf, "%s/Library/Logs/X11/%s.log", home,
                           bundle_id_prefix);
-        assert(nbytes > 0);
+        if (nbytes <= 0) {
+            FatalError("darwin OsVendorInit: "
+                       "asprintf of log file name failed.\n");
+        }
         LogInit(lf, ".old");
         free(lf);
 
