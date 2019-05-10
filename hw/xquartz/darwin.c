@@ -517,13 +517,15 @@ InitInput(int argc, char **argv)
         .rules   = "base", .model         = "empty", .layout = "empty",
         .variant = NULL,   .options       = NULL
     };
+    int result;
 
     /* We need to really have rules... or something... */
     XkbSetRulesDflts(&rmlvo);
 
-    assert(Success == AllocDevicePair(serverClient, "xquartz virtual",
-                                      &darwinPointer, &darwinKeyboard,
-                                      DarwinMouseProc, DarwinKeybdProc, FALSE));
+    result = AllocDevicePair(serverClient, "xquartz virtual",
+                             &darwinPointer, &darwinKeyboard,
+                             DarwinMouseProc, DarwinKeybdProc, FALSE);
+    assert(result == Success);
 
     /* here's the snippet from the current gdk sources:
        if (!strcmp (tmp_name, "pointer"))
@@ -677,8 +679,12 @@ OsVendorInit(void)
     if (serverGeneration == 1) {
         char *lf;
         char *home = getenv("HOME");
+        int nbytes;
+
         assert(home);
-        assert(0 < asprintf(&lf, "%s/Library/Logs/X11", home));
+
+        nbytes = asprintf(&lf, "%s/Library/Logs/X11", home);
+        assert(nbytes > 0);
 
         /* Ignore errors.  If EEXIST, we don't care.  If anything else,
          * LogInit will handle it for us.
@@ -686,9 +692,9 @@ OsVendorInit(void)
         (void)mkdir(lf, S_IRWXU | S_IRWXG | S_IRWXO);
         free(lf);
 
-        assert(0 <
-               asprintf(&lf, "%s/Library/Logs/X11/%s.log", home,
-                        bundle_id_prefix));
+        nbytes = asprintf(&lf, "%s/Library/Logs/X11/%s.log", home,
+                          bundle_id_prefix);
+        assert(nbytes > 0);
         LogInit(lf, ".old");
         free(lf);
 
