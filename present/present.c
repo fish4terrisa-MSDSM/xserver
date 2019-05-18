@@ -70,16 +70,16 @@ present_get_crtc(WindowPtr window)
  * Copies the update region from a pixmap to the target drawable
  */
 void
-present_copy_region(DrawablePtr drawable,
-                    PixmapPtr pixmap,
+present_copy_region(DrawablePtr source,
+                    DrawablePtr destination,
                     RegionPtr update,
                     int16_t x_off,
                     int16_t y_off)
 {
-    ScreenPtr   screen = drawable->pScreen;
+    ScreenPtr   screen = destination->pScreen;
     GCPtr       gc;
 
-    gc = GetScratchGC(drawable->depth, screen);
+    gc = GetScratchGC(destination->depth, screen);
     if (update) {
         ChangeGCVal     changes[2];
 
@@ -90,12 +90,12 @@ present_copy_region(DrawablePtr drawable,
                  changes);
         (*gc->funcs->ChangeClip)(gc, CT_REGION, update, 0);
     }
-    ValidateGC(drawable, gc);
-    (*gc->ops->CopyArea)(&pixmap->drawable,
-                         drawable,
+    ValidateGC(destination, gc);
+    (*gc->ops->CopyArea)(source,
+                         destination,
                          gc,
                          0, 0,
-                         pixmap->drawable.width, pixmap->drawable.height,
+                         source->width, source->height,
                          x_off, y_off);
     if (update)
         (*gc->funcs->ChangeClip)(gc, CT_NONE, NULL, 0);
