@@ -1791,6 +1791,39 @@ drmmode_set_scanout_pixmap(xf86CrtcPtr crtc, PixmapPtr ppix)
 }
 
 static void *
+drmmode_pixmap_allocate(xf86CrtcPtr crtc, int width, int height)
+{
+    drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
+    drmmode_ptr drmmode = drmmode_crtc->drmmode;
+    drmmode_bo *bo;
+    int ret;
+
+    bo = calloc(1, sizeof(drmmode_bo));
+    if (!bo)
+        return NULL;
+
+    if (!drmmode_create_bo(drmmode, bo,
+                           width, height, drmmode->kbpp)) {
+        xf86DrvMsg(crtc->scrn->scrnIndex, X_ERROR,
+               "Couldn't allocate memory for pixmap requested by X internally.\n");
+        free(bo);
+        return NULL;
+    }
+
+    ret = drmmode_bo_import(drmmode, bo, &bo->fb_id);
+
+    if (ret) {
+        ErrorF("failed to add bo fb\n");
+        drmmode_bo_destroy(drmmode, bo);
+        free(bo);
+        return NULL;
+    }
+    bo->crtc = crtc;
+
+    return bo;
+}
+
+static void *
 drmmode_shadow_allocate(xf86CrtcPtr crtc, int width, int height)
 {
     drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
@@ -1841,6 +1874,56 @@ drmmode_create_pixmap_header(ScreenPtr pScreen, int width, int height,
 
 static Bool
 drmmode_set_pixmap_bo(drmmode_ptr drmmode, PixmapPtr pixmap, drmmode_bo *bo);
+
+PixmapPtr
+drmmode_create_scanout_pixmap(xf86CrtcPtr crtc, void **data, int width, int height)
+{
+    ScrnInfoPtr scrn = crtc->scrn;
+    drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
+    drmmode_ptr drmmode = drmmode_crtc->drmmode;
+    uint32_t pitch;
+    drmmode_bo *bo;
+    void *pPixData;
+    PixmapPtr pixmap;
+
+    *data = NULL;
+    bo = drmmode_pixmap_allocate(crtc, width, height);
+    if (!bo)
+        return NULL;
+
+    if (!drmmode_bo_has_bo(bo))
+        return NULL;
+
+    pPixData = drmmode_bo_map(drmmode, bo);
+    pitch = drmmode_bo_get_pitch(bo);
+
+    pixmap = drmmode_create_pixmap_header(scrn->pScreen,
+                                          width, height,
+                                          scrn->depth,
+                                          drmmode->kbpp,
+                                          pitch,
+                                          pPixData);
+    if (!pixmap)
+        return NULL;
+
+    drmmode_set_pixmap_bo(drmmode, pixmap, bo);
+
+    *data = bo;
+    return pixmap;
+}
+
+void
+drmmode_destroy_scanout_pixmap(void *data)
+{
+    drmmode_bo *bo = data;
+    drmmode_crtc_private_ptr drmmode_crtc = bo->crtc->driver_private;
+    drmmode_ptr drmmode = drmmode_crtc->drmmode;
+
+    drmModeRmFB(drmmode->fd, bo->fb_id);
+
+    drmmode_bo_destroy(drmmode, bo);
+    free(bo);
+}
 
 static PixmapPtr
 drmmode_shadow_create(xf86CrtcPtr crtc, void *data, int width, int height)

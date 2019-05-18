@@ -71,6 +71,7 @@ enum drmmode_crtc_property {
 };
 
 typedef struct {
+    xf86CrtcPtr crtc;
     uint32_t width;
     uint32_t height;
     struct dumb_bo *dumb;
@@ -78,6 +79,7 @@ typedef struct {
     Bool used_modifiers;
     struct gbm_bo *gbm;
 #endif
+    unsigned fb_id;
 } drmmode_bo;
 
 typedef struct {
@@ -284,5 +286,8 @@ void drmmode_copy_fb(ScrnInfoPtr pScrn, drmmode_ptr drmmode);
 int drmmode_crtc_flip(xf86CrtcPtr crtc, uint32_t fb_id, uint32_t flags, void *data);
 
 void drmmode_set_dpms(ScrnInfoPtr scrn, int PowerManagementMode, int flags);
+
+PixmapPtr drmmode_create_scanout_pixmap(xf86CrtcPtr crtc, void **data, int width, int height);
+void drmmode_destroy_scanout_pixmap(void *data);
 
 #endif

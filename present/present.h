@@ -121,6 +121,13 @@ typedef void (*present_unflip_ptr) (ScreenPtr screen,
  */
 typedef void (*present_wnmd_flips_stop_ptr) (WindowPtr window);
 
+/* Return a scanout-able Pixmap
+ */
+typedef PixmapPtr (*present_create_pixmap_ptr) (RRCrtcPtr crtc,
+                                                void **data,
+                                                int width, int height);
+typedef void (*present_destroy_pixmap_ptr) (void *data);
+
 #define PRESENT_SCREEN_INFO_VERSION        1
 
 typedef struct present_screen_info {
@@ -136,6 +143,8 @@ typedef struct present_screen_info {
     present_flip_ptr                    flip;
     present_unflip_ptr                  unflip;
     present_check_flip2_ptr             check_flip2;
+    present_create_pixmap_ptr           create_pixmap;
+    present_destroy_pixmap_ptr          destroy_pixmap;
 
 } present_screen_info_rec, *present_screen_info_ptr;
 

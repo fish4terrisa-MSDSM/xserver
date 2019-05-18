@@ -378,6 +378,25 @@ ms_present_unflip(ScreenPtr screen, uint64_t event_id)
 }
 #endif
 
+/*
+ * Return a scanout-able Pixmap
+ */
+static PixmapPtr
+ms_create_scanout_pixmap(RRCrtcPtr crtc, void **data, int width, int height)
+{
+    xf86CrtcPtr xf86_crtc = crtc->devPrivate;
+    return drmmode_create_scanout_pixmap(xf86_crtc,
+                                         data,
+                                         width,
+                                         height);
+}
+
+static void
+ms_destroy_scanout_pixmap(void *data)
+{
+    drmmode_destroy_scanout_pixmap(data);
+}
+
 static present_screen_info_rec ms_present_screen_info = {
     .version = PRESENT_SCREEN_INFO_VERSION,
 
@@ -394,6 +413,8 @@ static present_screen_info_rec ms_present_screen_info = {
     .flip = ms_present_flip,
     .unflip = ms_present_unflip,
 #endif
+    .create_pixmap = ms_create_scanout_pixmap,
+    .destroy_pixmap = ms_destroy_scanout_pixmap,
 };
 
 Bool
