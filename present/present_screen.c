@@ -50,6 +50,12 @@ present_get_window_priv(WindowPtr window, Bool create)
     xorg_list_init(&window_priv->flip_queue);
     xorg_list_init(&window_priv->idle_queue);
 
+    xorg_list_init(&window_priv->auto_descendant_head);
+    xorg_list_init(&window_priv->auto_descendant_node);
+
+    xorg_list_init(&window_priv->auto_head);
+    xorg_list_init(&window_priv->auto_node);
+
     window_priv->window = window;
     window_priv->crtc = PresentCrtcNeverSet;
     dixSetPrivate(&window->devPrivates, &present_window_private_key, window_priv);
@@ -100,14 +106,23 @@ present_clear_window_flip(WindowPtr window)
     present_vblank_ptr          flip_pending = screen_priv->flip_pending;
     present_vblank_ptr          flip_active = screen_priv->flip_active;
 
-    if (flip_pending && flip_pending->window == window) {
-        present_set_abort_flip(screen);
-        flip_pending->window = NULL;
+    if (flip_pending) {
+        if (flip_pending->window == window) {
+            present_set_abort_flip(screen);
+            flip_pending->window = NULL;
+        } else {
+            present_comp_destroy_auto_client_vblank(flip_pending, window, -1);
+        }
     }
-    if (flip_active && flip_active->window == window) {
-        present_restore_screen_pixmap(screen);
-        present_vblank_destroy(flip_active);
-        screen_priv->flip_active = NULL;
+
+    if (flip_active) {
+        if (flip_active->window == window) {
+            present_restore_screen_pixmap(screen);
+            present_vblank_destroy(flip_active);
+            screen_priv->flip_active = NULL;
+        } else {
+            present_comp_destroy_auto_client_vblank(flip_active, window, -1);
+        }
     }
 }
 
@@ -138,6 +153,30 @@ present_wnmd_clear_window_flip(WindowPtr window)
 }
 
 /*
+ * Hook the unrealize window function to clean up auto-list entries
+ *
+ * TODO: should/can we do this instead via present_clip_notify?
+ */
+static Bool
+present_unrealize_window(WindowPtr window)
+{
+    Bool ret;
+    ScreenPtr screen = window->drawable.pScreen;
+    present_screen_priv_ptr screen_priv = present_screen_priv(screen);
+
+    /* on unmap abort all auto-compositing (allows reparenting) */
+    present_comp_cleanup_window(window);
+
+    unwrap(screen_priv, screen, UnrealizeWindow);
+    if (screen->UnrealizeWindow)
+        ret = screen->UnrealizeWindow (window);
+    else
+        ret = TRUE;
+    wrap(screen_priv, screen, UnrealizeWindow, present_unrealize_window);
+    return ret;
+}
+
+/*
  * Hook the close window function to clean up our window private
  */
 static Bool
@@ -158,6 +197,7 @@ present_destroy_window(WindowPtr window)
         else
             present_clear_window_flip(window);
 
+        present_comp_cleanup_window(window);    // TODO: not needed? we do it already when unrealizing.
         free(window_priv);
     }
     unwrap(screen_priv, screen, DestroyWindow);
@@ -231,6 +271,7 @@ present_screen_priv_init(ScreenPtr screen)
         return NULL;
 
     wrap(screen_priv, screen, CloseScreen, present_close_screen);
+    wrap(screen_priv, screen, UnrealizeWindow, present_unrealize_window);
     wrap(screen_priv, screen, DestroyWindow, present_destroy_window);
     wrap(screen_priv, screen, ConfigNotify, present_config_notify);
     wrap(screen_priv, screen, ClipNotify, present_clip_notify);

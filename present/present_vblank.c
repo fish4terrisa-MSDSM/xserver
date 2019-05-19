@@ -29,17 +29,48 @@
 void
 present_vblank_notify(present_vblank_ptr vblank, CARD8 kind, CARD8 mode, uint64_t ust, uint64_t crtc_msc)
 {
+    present_vblank_ptr client_vblank;
     int n;
 
-    if (vblank->window)
-        present_send_complete_notify(vblank->window, kind, mode, vblank->serial, ust, crtc_msc - vblank->msc_offset);
-    for (n = 0; n < vblank->num_notifies; n++) {
-        WindowPtr   window = vblank->notifies[n].window;
-        CARD32      serial = vblank->notifies[n].serial;
+    if (!vblank->auto_internal) {
+        if (vblank->window) {
+            present_send_complete_notify(vblank->window, kind, mode, vblank->serial, ust, crtc_msc - vblank->msc_offset);
+        }
+        for (n = 0; n < vblank->num_notifies; n++) {
+            WindowPtr   window = vblank->notifies[n].window;
+            CARD32      serial = vblank->notifies[n].serial;
 
-        if (window)
-            present_send_complete_notify(window, kind, mode, serial, ust, crtc_msc - vblank->msc_offset);
+            if (window)
+                present_send_complete_notify(window, kind, mode, serial, ust, crtc_msc - vblank->msc_offset);
+        }
     }
+
+    xorg_list_for_each_entry(client_vblank, &vblank->auto_clients_vblanks, auto_client_link) {
+        present_vblank_notify(client_vblank, kind, mode, ust, crtc_msc);
+    }
+}
+
+static void
+present_vblank_configure_auto_comp(present_vblank_ptr vblank)
+{
+    present_window_priv_ptr client_window_priv, target_priv;
+
+    client_window_priv = present_comp_client_window(vblank->window);
+    if (!client_window_priv)
+        /* Simple vblank without auto-composition available. */
+        return;
+
+    target_priv = present_window_priv(client_window_priv->auto_target);
+    assert(target_priv);
+
+    if (target_priv->crtc != vblank->crtc)
+        /* Currently we can't auto-composite windows on other crtc.
+         * TODO: To change this timing differences between crtcs must be respected
+         *       and probably in general flips per crtc possible.
+         */
+        return;
+
+    vblank->auto_target = target_priv->window;
 }
 
 /* Configures the vblank to do a synced or async flip if possible.
@@ -119,6 +150,8 @@ present_vblank_create(WindowPtr window,
 
     xorg_list_append(&vblank->window_list, &window_priv->vblank);
     xorg_list_init(&vblank->event_queue);
+    xorg_list_init(&vblank->auto_clients_vblanks);
+    xorg_list_init(&vblank->auto_client_link);
 
     vblank->screen = screen;
     vblank->window = window;
@@ -156,6 +189,7 @@ present_vblank_create(WindowPtr window,
     vblank->flip_idler = FALSE;
     vblank->queued = TRUE;
 
+    present_vblank_configure_auto_comp(vblank);
     *target_msc = present_vblank_configure_flip(vblank, options, capabilities, crtc_msc);
 
     if (wait_fence) {
@@ -193,8 +227,10 @@ present_vblank_scrap(present_vblank_ptr vblank)
 
     present_pixmap_idle(vblank);
     present_fence_destroy(vblank->idle_fence);
+
     dixDestroyPixmap(vblank->pixmap, vblank->pixmap->drawable.id);
 
+    xorg_list_del(&vblank->auto_client_link);
     vblank->pixmap = NULL;
     vblank->idle_fence = NULL;
     vblank->flip = FALSE;
@@ -203,10 +239,20 @@ present_vblank_scrap(present_vblank_ptr vblank)
 void
 present_vblank_destroy(present_vblank_ptr vblank)
 {
+    present_screen_priv_ptr screen_priv = present_screen_priv(vblank->screen);
+    present_vblank_ptr      client_vblank, tmp;
     /* Remove vblank from window and screen lists */
     xorg_list_del(&vblank->window_list);
     /* Also make sure vblank is removed from event queue (wnmd) */
     xorg_list_del(&vblank->event_queue);
+
+    /* remove client vblanks from being auto-composited into this */
+    xorg_list_for_each_entry_safe(client_vblank, tmp, &vblank->auto_clients_vblanks, auto_client_link) {
+        screen_priv->abort_vblank(client_vblank->screen, client_vblank->window,
+                                  client_vblank->crtc,
+                                  client_vblank->event_id, client_vblank->target_msc);
+        present_vblank_destroy(client_vblank);
+    }; // TODO: do this with adapted present_comp_destroy_auto_client_vblank?
 
     DebugPresent(("\td %" PRIu64 " %p %" PRIu64 ": %08" PRIx32 " -> %08" PRIx32 "\n",
                   vblank->event_id, vblank, vblank->target_msc,
@@ -231,6 +277,9 @@ present_vblank_destroy(present_vblank_ptr vblank)
 
     if (vblank->notifies)
         present_destroy_notifies(vblank->notifies, vblank->num_notifies);
+
+    /* remove this vblank from being auto-composited */
+    xorg_list_del(&vblank->auto_client_link);
 
     free(vblank);
 }

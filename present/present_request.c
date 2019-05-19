@@ -157,6 +157,28 @@ proc_present_pixmap(ClientPtr client)
 }
 
 static int
+proc_present_set_auto_list(ClientPtr client)
+{
+    REQUEST(xPresentSetAutoListReq);
+    WindowPtr target;
+    int rc, nwindows;
+
+    REQUEST_AT_LEAST_SIZE(xPresentSetAutoListReq);
+
+    rc = dixLookupWindow(&target, stuff->target, client, DixReadAccess);
+    if (rc != Success)
+        return rc;
+
+
+    nwindows = (client->req_len << 2) - sizeof (xPresentSetAutoListReq);
+    if (nwindows % sizeof (Window))
+        return BadLength;
+
+    nwindows /= sizeof (Window);
+    return present_comp_set_auto_list(client, target, nwindows, (Window *) (stuff + 1));
+}
+
+static int
 proc_present_notify_msc(ClientPtr client)
 {
     REQUEST(xPresentNotifyMSCReq);
@@ -250,6 +272,7 @@ static int (*proc_present_vector[PresentNumberRequests]) (ClientPtr) = {
     proc_present_notify_msc,               /* 2 */
     proc_present_select_input,             /* 3 */
     proc_present_query_capabilities,       /* 4 */
+    proc_present_set_auto_list,            /* 5 */
 };
 
 int
@@ -329,12 +352,23 @@ sproc_present_query_capabilities (ClientPtr client)
     return (*proc_present_vector[stuff->presentReqType]) (client);
 }
 
+static int _X_COLD
+sproc_present_set_auto_list (ClientPtr client)
+{
+    REQUEST(xPresentSetAutoListReq);
+    REQUEST_SIZE_MATCH(xPresentSetAutoListReq);
+    swaps(&stuff->length);
+    swapl(&stuff->target);
+    return (*proc_present_vector[stuff->presentReqType]) (client);
+}
+
 static int (*sproc_present_vector[PresentNumberRequests]) (ClientPtr) = {
     sproc_present_query_version,           /* 0 */
     sproc_present_pixmap,                  /* 1 */
     sproc_present_notify_msc,              /* 2 */
     sproc_present_select_input,            /* 3 */
     sproc_present_query_capabilities,      /* 4 */
+    sproc_present_set_auto_list,           /* 5 */
 };
 
 int _X_COLD

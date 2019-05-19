@@ -51,7 +51,8 @@ present_wnmd_create_event_id(present_window_priv_ptr window_priv, present_vblank
 static uint32_t
 present_wnmd_query_capabilities(present_screen_priv_ptr screen_priv)
 {
-    return screen_priv->wnmd_info->capabilities;
+    /* In window mode auto-composite is not supported at the moment. */
+    return screen_priv->wnmd_info->capabilities & ~PresentCapabilityAutoComposite;
 }
 
 static RRCrtcPtr

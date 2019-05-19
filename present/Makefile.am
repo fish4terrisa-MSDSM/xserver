@@ -6,6 +6,7 @@ AM_CFLAGS = \
 libpresent_la_SOURCES = \
 	present.h \
 	present.c \
+	present_comp.c \
 	present_event.c \
 	present_execute.c \
 	present_fake.c \

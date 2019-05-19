@@ -78,7 +78,7 @@ present_execute_copy(present_vblank_ptr vblank, uint64_t crtc_msc)
 
     assert(vblank->target_msc <= crtc_msc + 1);
 
-    /* If present_flip failed, we may have to requeue for the target MSC */
+    /* If present_flip or auto composite failed, we may have to requeue for the target MSC */
     if (vblank->target_msc == crtc_msc + 1 &&
         Success == screen_priv->queue_vblank(screen,
                                              window,

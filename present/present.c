@@ -27,17 +27,6 @@
 #include "present_priv.h"
 #include <gcstruct.h>
 
-/*
- * Returns:
- * TRUE if the first MSC value is equal to or after the second one
- * FALSE if the first MSC value is before the second one
- */
-static Bool
-msc_is_equal_or_after(uint64_t test, uint64_t reference)
-{
-    return (int64_t)(test - reference) >= 0;
-}
-
 uint32_t
 present_query_capabilities(RRCrtcPtr crtc)
 {
@@ -105,13 +94,18 @@ present_copy_region(DrawablePtr source,
 void
 present_pixmap_idle(present_vblank_ptr vblank)
 {
-    if (vblank->pixmap) {
+    present_vblank_ptr vbl;
+
+    if (vblank->pixmap && !vblank->auto_internal) {
         if (vblank->idle_fence)
             present_fence_set_triggered(vblank->idle_fence);
         if (vblank->window) {
             DebugPresent(("\ti %08" PRIx32 "\n", vblank->pixmap ? vblank->pixmap->drawable.id : 0));
             present_send_idle_notify(vblank->window, vblank->serial, vblank->pixmap, vblank->idle_fence);
         }
+    }
+    xorg_list_for_each_entry(vbl, &vblank->auto_clients_vblanks, auto_client_link) {
+        present_pixmap_idle(vbl);
     }
 }
 

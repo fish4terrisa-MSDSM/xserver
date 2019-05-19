@@ -176,7 +176,8 @@ present_scmd_query_capabilities(present_screen_priv_ptr screen_priv)
     if (!screen_priv->info)
         return 0;
 
-    return screen_priv->info->capabilities;
+    return screen_priv->info->capabilities |
+            (screen_priv->info->create_pixmap ? PresentCapabilityAutoComposite : 0);
 }
 
 static int
@@ -515,6 +516,17 @@ present_scmd_can_window_flip(WindowPtr window)
     return TRUE;
 }
 
+static void
+present_scmd_set_queued(present_vblank_ptr vblank, Bool queued)
+{
+    present_vblank_ptr vbl;
+
+    vblank->queued = queued;
+    xorg_list_for_each_entry(vbl, &vblank->auto_clients_vblanks, auto_client_link) {
+        vbl->queued = queued;
+    }
+}
+
 /*
  * Once the required MSC has been reached, execute the pending request.
  *
@@ -549,9 +561,10 @@ present_execute(present_vblank_ptr vblank, uint64_t ust, uint64_t crtc_msc)
 
     xorg_list_del(&vblank->event_queue);
     xorg_list_del(&vblank->window_list);
-    vblank->queued = FALSE;
+    present_scmd_set_queued(vblank, FALSE);
 
     if (vblank->pixmap && vblank->window) {
+        present_comp_execute_target(vblank);
 
         if (vblank->flip) {
 
@@ -618,6 +631,7 @@ present_execute(present_vblank_ptr vblank, uint64_t ust, uint64_t crtc_msc)
         present_execute_copy(vblank, crtc_msc);
 
         if (vblank->queued) {
+            present_scmd_set_queued(vblank, TRUE);
             xorg_list_add(&vblank->event_queue, &present_exec_queue);
             xorg_list_append(&vblank->window_list,
                              &present_get_window_priv(window, TRUE)->vblank);
@@ -638,9 +652,12 @@ present_scmd_replace_queued(present_vblank_ptr vblank)
 {
     present_window_priv_ptr window_priv = present_window_priv(vblank->window);
     present_vblank_ptr      vbl, tmp;
+    struct xorg_list        client_vblanks;
 
     if (vblank->update || !vblank->pixmap)
         return;
+
+    xorg_list_init(&client_vblanks);
 
     xorg_list_for_each_entry_safe(vbl, tmp, &window_priv->vblank, window_list) {
         if (!vbl->pixmap)
@@ -655,11 +672,106 @@ present_scmd_replace_queued(present_vblank_ptr vblank)
         if (vbl == vblank)
             continue;
 
+        if (!xorg_list_is_empty(&vbl->auto_clients_vblanks)) {
+            /* Remember auto composited clients */
+            struct xorg_list *current_last_entry = client_vblanks.prev;
+            current_last_entry->next = vbl->auto_clients_vblanks.next;
+            current_last_entry->next->prev = current_last_entry;
+
+            client_vblanks.prev = vbl->auto_clients_vblanks.prev;
+            client_vblanks.prev->next = &client_vblanks;
+
+            xorg_list_init(&vbl->auto_clients_vblanks);
+        }
+
         present_vblank_scrap(vbl);
 
-        if (vbl->flip_ready)
+        if (vbl->flip_ready || vbl->auto_target) {
+            if (vbl->auto_target) {
+                vbl->auto_target = NULL;
+                vbl->requeue = TRUE;
+            }
             present_re_execute(vbl);
+        }
     }
+
+    if (!xorg_list_is_empty(&client_vblanks)) {
+        /* Move existing client vblanks into the replacement */
+        vblank->auto_clients_vblanks.next = client_vblanks.next;
+        client_vblanks.next->prev = &vblank->auto_clients_vblanks;
+
+        vblank->auto_clients_vblanks.prev = client_vblanks.prev;
+        client_vblanks.prev->next = &vblank->auto_clients_vblanks;
+
+        xorg_list_init(&client_vblanks);
+    }
+}
+
+static int
+present_scmd_comp(present_vblank_ptr comp_vblank,
+                  Bool sync_vblank,
+                  RegionPtr valid,
+                  RegionPtr update,
+                  int16_t x_off,
+                  int16_t y_off,
+                  uint64_t crtc_ust,
+                  uint64_t crtc_msc)
+{
+    ScreenPtr               screen = comp_vblank->screen;
+    present_screen_priv_ptr screen_priv = present_screen_priv(screen);
+    present_window_priv_ptr target_priv = present_window_priv(comp_vblank->auto_target);
+    uint64_t                target_msc = comp_vblank->target_msc;
+    present_vblank_ptr      vblank;
+
+    assert (target_msc > crtc_msc);
+
+    vblank = present_vblank_create(target_priv->window,
+                                   target_priv->auto_target_buf[1].pixmap,
+                                   0,
+                                   valid,
+                                   update,
+                                   x_off,
+                                   y_off,
+                                   comp_vblank->crtc,
+                                   NULL,
+                                   NULL,
+                                   0,
+                                   screen_priv->info ? &screen_priv->info->capabilities : NULL,
+                                   NULL,
+                                   0,
+                                   &target_msc,
+                                   crtc_msc);
+    if (!vblank)
+        return BadAlloc;
+
+    present_scmd_replace_queued(vblank);
+
+    present_comp_destroy_auto_client_vblank(vblank, comp_vblank->window,
+                                            PresentCompleteModeSkip);
+    if (sync_vblank)
+        xorg_list_add(&comp_vblank->auto_client_link, &vblank->auto_clients_vblanks);
+    vblank->auto_internal = TRUE;
+
+    if (vblank->auto_target) {
+        /* Vblank is destined to be auto-composited. */
+        present_comp_pixmap(vblank, crtc_ust, crtc_msc);
+        return Success;
+    }
+
+    xorg_list_append(&vblank->event_queue, &present_exec_queue);
+    if (msc_is_after(target_msc, crtc_msc)) {
+        if (Success == present_queue_vblank(screen,
+                                            target_priv->window,
+                                            comp_vblank->crtc,
+                                            vblank->event_id,
+                                            target_msc))
+            return Success;
+
+        DebugPresent(("present_queue_vblank failed\n"));
+    }
+
+    present_execute(vblank, crtc_ust, crtc_msc);
+    return Success;
 }
 
 static int
@@ -736,11 +848,17 @@ present_scmd_pixmap(WindowPtr window,
                                    num_notifies,
                                    &target_msc,
                                    crtc_msc);
-
     if (!vblank)
         return BadAlloc;
 
     present_scmd_replace_queued(vblank);
+
+    if (vblank->auto_target) {
+        /* Vblank is destined to be auto-composited. */
+        present_comp_pixmap(vblank, ust, crtc_msc);
+        return Success;
+    }
+
     xorg_list_append(&vblank->event_queue, &present_exec_queue);
 
     if (msc_is_after(target_msc, crtc_msc)) {
@@ -811,6 +929,7 @@ present_scmd_init_mode_hooks(present_screen_priv_ptr screen_priv)
     screen_priv->can_window_flip    =   &present_scmd_can_window_flip;
 
     screen_priv->present_pixmap     =   &present_scmd_pixmap;
+    screen_priv->present_comp       =   &present_scmd_comp;
     screen_priv->create_event_id    =   &present_scmd_create_event_id;
 
     screen_priv->queue_vblank       =   &present_queue_vblank;

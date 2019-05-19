@@ -85,6 +85,11 @@ struct present_vblank {
     Bool                abort_flip;     /* aborting this flip */
     PresentFlipReason   reason;         /* reason for which flip is not possible */
     Bool                has_suboptimal; /* whether client can support SuboptimalCopy mode */
+
+    WindowPtr           auto_target;            /* pending target of an auto-composited vblank */
+    struct xorg_list    auto_clients_vblanks;   /* clients vblanks being auto-composited into this vblank */
+    struct xorg_list    auto_client_link;
+    Bool                auto_internal;          /* server-internal vblank on target to auto-composite clients */
 };
 
 typedef struct present_screen_priv present_screen_priv_rec, *present_screen_priv_ptr;
@@ -125,6 +130,15 @@ typedef int (*present_priv_pixmap_ptr)(WindowPtr window,
                                        present_notify_ptr notifies,
                                        int num_notifies);
 
+typedef int (*present_priv_comp_ptr)(present_vblank_ptr comp_vblank,
+                                     Bool sync_vblank,
+                                     RegionPtr valid,
+                                     RegionPtr update,
+                                     int16_t x_off,
+                                     int16_t y_off,
+                                     uint64_t crtc_ust,
+                                     uint64_t crtc_msc);
+
 typedef void (*present_priv_create_event_id_ptr)(present_window_priv_ptr window_priv,
                                                  present_vblank_ptr vblank);
 
@@ -146,6 +160,7 @@ typedef void (*present_priv_flip_destroy_ptr)(ScreenPtr screen);
 struct present_screen_priv {
     CloseScreenProcPtr          CloseScreen;
     ConfigNotifyProcPtr         ConfigNotify;
+    UnrealizeWindowProcPtr      UnrealizeWindow;
     DestroyWindowProcPtr        DestroyWindow;
     ClipNotifyProcPtr           ClipNotify;
 
@@ -167,6 +182,7 @@ struct present_screen_priv {
     present_priv_can_window_flip_ptr    can_window_flip;
 
     present_priv_pixmap_ptr             present_pixmap;
+    present_priv_comp_ptr               present_comp;
     present_priv_create_event_id_ptr    create_event_id;
 
     present_priv_queue_vblank_ptr       queue_vblank;
@@ -205,6 +221,15 @@ typedef struct present_event {
     int mask;
 } present_event_rec;
 
+typedef struct present_auto_buf {
+    WindowPtr               window;
+    PixmapPtr               pixmap;   /* Copy, reference for target, client content. */
+    CARD32                  serial;
+    struct present_fence    *idle_fence;
+    void                    *driver_data;
+    Bool                    is_clean;
+} present_auto_buf_rec, *present_auto_buf_ptr;
+
 struct present_window_priv {
     WindowPtr              window;
     present_event_ptr      events;
@@ -213,6 +238,33 @@ struct present_window_priv {
     uint64_t               msc;         /* Last reported MSC from the current crtc */
     struct xorg_list       vblank;
     struct xorg_list       notifies;
+
+    /* Auto compositing */
+    struct xorg_list       auto_head;       /* List of windows being auto-composited into this window. */
+    struct xorg_list       auto_node;
+
+    WindowPtr              auto_target;     /* If window is auto-composited, points to the target window. */
+    WindowPtr              auto_ancestor;   /* Window is not directly auto-composited, but some ancestor does. */
+
+    struct xorg_list       auto_descendant_head; /* Windows, this window acts for as an auto-composited ancestor. */
+    struct xorg_list       auto_descendant_node;
+
+    /*
+     * Pixmap buffer for this window as an auto-composition target.
+     *
+     * - Buf0 is being out-scanned at the moment (not if the target
+     *   has presented a Pixmap on its own).
+     * - Buf1 will be the composition base for the next frame.
+     */
+    present_auto_buf_rec   auto_target_buf[2];
+    /*
+     * Pixmap reference for this window as an auto-composition client.
+     *
+     * If exists, provides the most recent pixel data the client provided
+     * via an async Present-Pixmap call by the time a vblank-synced update
+     * of the compositor hits.
+     */
+    present_auto_buf_rec   auto_client_buf;
 
     /* Used for window flips */
     uint64_t               event_id;
@@ -246,6 +298,17 @@ static inline Bool
 msc_is_after(uint64_t test, uint64_t reference)
 {
     return (int64_t)(test - reference) > 0;
+}
+
+/*
+ * Returns:
+ * TRUE if the first MSC value is equal to or after the second one
+ * FALSE if the first MSC value is before the second one
+ */
+static inline Bool
+msc_is_equal_or_after(uint64_t test, uint64_t reference)
+{
+    return (int64_t)(test - reference) >= 0;
 }
 
 /*
@@ -303,6 +366,31 @@ present_notify_msc(WindowPtr window,
                    uint64_t target_msc,
                    uint64_t divisor,
                    uint64_t remainder);
+
+/*
+ * present_comp.c
+ */
+present_window_priv_ptr
+present_comp_client_window(WindowPtr window);
+
+void
+present_comp_destroy_auto_client_vblank(present_vblank_ptr target,
+                                        WindowPtr window,
+                                        int notify_mode);
+
+Bool
+present_comp_pixmap(present_vblank_ptr vblank,
+                    uint64_t crtc_ust,
+                    uint64_t crtc_msc);
+
+void
+present_comp_execute_target(present_vblank_ptr vblank);
+
+int
+present_comp_set_auto_list(ClientPtr client, WindowPtr target, int nwindows, Window *windows);
+
+void
+present_comp_cleanup_window(WindowPtr window);
 
 /*
  * present_event.c
