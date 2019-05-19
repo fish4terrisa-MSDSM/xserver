@@ -373,6 +373,7 @@ present_flip_notify(present_vblank_ptr vblank, uint64_t ust, uint64_t crtc_msc)
     present_flip_idle(screen);
 
     xorg_list_del(&vblank->event_queue);
+    assert(xorg_list_is_empty(&vblank->window_list));
 
     /* Transfer reference for pixmap and fence from vblank to screen_priv */
     screen_priv->flip_crtc = vblank->crtc;

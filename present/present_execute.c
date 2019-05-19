@@ -49,6 +49,7 @@ present_execute_wait(present_vblank_ptr vblank, uint64_t crtc_msc)
     present_screen_priv_ptr screen_priv = present_screen_priv(screen);
 
     if (vblank->requeue) {
+        assert(!vblank->flip);
         vblank->requeue = FALSE;
         if (msc_is_after(vblank->target_msc, crtc_msc) &&
             Success == screen_priv->queue_vblank(screen,
@@ -74,6 +75,8 @@ present_execute_copy(present_vblank_ptr vblank, uint64_t crtc_msc)
     WindowPtr                   window = vblank->window;
     ScreenPtr                   screen = window->drawable.pScreen;
     present_screen_priv_ptr screen_priv = present_screen_priv(screen);
+
+    assert(vblank->target_msc <= crtc_msc + 1);
 
     /* If present_flip failed, we may have to requeue for the target MSC */
     if (vblank->target_msc == crtc_msc + 1 &&
