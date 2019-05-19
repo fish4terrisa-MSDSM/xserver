@@ -98,14 +98,16 @@ present_clear_window_flip(WindowPtr window)
     ScreenPtr                   screen = window->drawable.pScreen;
     present_screen_priv_ptr     screen_priv = present_screen_priv(screen);
     present_vblank_ptr          flip_pending = screen_priv->flip_pending;
+    present_vblank_ptr          flip_active = screen_priv->flip_active;
 
     if (flip_pending && flip_pending->window == window) {
         present_set_abort_flip(screen);
         flip_pending->window = NULL;
     }
-    if (screen_priv->flip_window == window) {
+    if (flip_active && flip_active->window == window) {
         present_restore_screen_pixmap(screen);
-        screen_priv->flip_window = NULL;
+        present_vblank_destroy(flip_active);
+        screen_priv->flip_active = NULL;
     }
 }
 

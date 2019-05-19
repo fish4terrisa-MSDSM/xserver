@@ -102,7 +102,7 @@ present_check_flip(RRCrtcPtr            crtc,
     screen_pixmap = screen->GetScreenPixmap(screen);
     window_pixmap = screen->GetWindowPixmap(window);
     if (window_pixmap != screen_pixmap &&
-        window_pixmap != screen_priv->flip_pixmap &&
+        (!screen_priv->flip_active || window_pixmap != screen_priv->flip_active->pixmap) &&
         window_pixmap != present_flip_pending_pixmap(screen))
         return FALSE;
 
@@ -282,19 +282,17 @@ static void
 present_flip_idle(ScreenPtr screen)
 {
     present_screen_priv_ptr screen_priv = present_screen_priv(screen);
+    present_vblank_ptr      vblank = screen_priv->flip_active;
 
-    if (screen_priv->flip_pixmap) {
-        present_pixmap_idle(screen_priv->flip_pixmap, screen_priv->flip_window,
-                            screen_priv->flip_serial, screen_priv->flip_idle_fence);
-        if (screen_priv->flip_idle_fence)
-            present_fence_destroy(screen_priv->flip_idle_fence);
-        dixDestroyPixmap(screen_priv->flip_pixmap, screen_priv->flip_pixmap->drawable.id);
-        screen_priv->flip_crtc = NULL;
-        screen_priv->flip_window = NULL;
-        screen_priv->flip_serial = 0;
-        screen_priv->flip_pixmap = NULL;
-        screen_priv->flip_idle_fence = NULL;
-    }
+    if (!vblank)
+        return;
+
+    if (vblank->pixmap)
+        present_pixmap_idle(vblank->pixmap, vblank->window,
+                            vblank->serial, vblank->idle_fence);
+
+    present_vblank_destroy(vblank);
+    screen_priv->flip_active = NULL;
 }
 
 void
@@ -305,12 +303,14 @@ present_restore_screen_pixmap(ScreenPtr screen)
     PixmapPtr flip_pixmap;
     WindowPtr flip_window;
 
+    assert(screen_priv->flip_pending || screen_priv->flip_active);
+
     if (screen_priv->flip_pending) {
         flip_window = screen_priv->flip_pending->window;
         flip_pixmap = screen_priv->flip_pending->pixmap;
     } else {
-        flip_window = screen_priv->flip_window;
-        flip_pixmap = screen_priv->flip_pixmap;
+        flip_window = screen_priv->flip_active->window;
+        flip_pixmap = screen_priv->flip_active->pixmap;
     }
 
     assert (flip_pixmap);
@@ -375,25 +375,13 @@ present_flip_notify(present_vblank_ptr vblank, uint64_t ust, uint64_t crtc_msc)
     xorg_list_del(&vblank->event_queue);
     assert(xorg_list_is_empty(&vblank->window_list));
 
-    /* Transfer reference for pixmap and fence from vblank to screen_priv */
-    screen_priv->flip_crtc = vblank->crtc;
-    screen_priv->flip_window = vblank->window;
-    screen_priv->flip_serial = vblank->serial;
-    screen_priv->flip_pixmap = vblank->pixmap;
-    screen_priv->flip_sync = vblank->sync_flip;
-    screen_priv->flip_idle_fence = vblank->idle_fence;
-
-    vblank->pixmap = NULL;
-    vblank->idle_fence = NULL;
-
+    screen_priv->flip_active = vblank;
     screen_priv->flip_pending = NULL;
 
     if (vblank->abort_flip)
         present_unflip(screen);
 
     present_vblank_notify(vblank, PresentCompleteKindPixmap, PresentCompleteModeFlip, ust, crtc_msc);
-    present_vblank_destroy(vblank);
-
     present_flip_try_ready(screen);
 }
 
@@ -448,6 +436,7 @@ present_check_flip_window (WindowPtr window)
     present_screen_priv_ptr     screen_priv = present_screen_priv(screen);
     present_window_priv_ptr     window_priv = present_window_priv(window);
     present_vblank_ptr          flip_pending = screen_priv->flip_pending;
+    present_vblank_ptr          flip_active = screen_priv->flip_active;
     present_vblank_ptr          vblank;
     PresentFlipReason           reason;
 
@@ -469,12 +458,13 @@ present_check_flip_window (WindowPtr window)
                                     flip_pending->sync_flip, NULL, 0, 0, NULL))
                 present_set_abort_flip(screen);
         }
-    } else {
+    } else if (flip_active) {
         /*
          * Check current flip
          */
-        if (window == screen_priv->flip_window) {
-            if (!present_check_flip(screen_priv->flip_crtc, window, screen_priv->flip_pixmap, screen_priv->flip_sync, NULL, 0, 0, NULL))
+        if (window == flip_active->window) {
+            if (!present_check_flip(flip_active->crtc, window, flip_active->pixmap,
+                                    flip_active->sync_flip, NULL, 0, 0, NULL))
                 present_unflip(screen);
         }
     }
@@ -511,7 +501,7 @@ present_scmd_can_window_flip(WindowPtr window)
     /* Make sure the window hasn't been redirected with Composite */
     window_pixmap = screen->GetWindowPixmap(window);
     if (window_pixmap != screen->GetScreenPixmap(screen) &&
-        window_pixmap != screen_priv->flip_pixmap &&
+        (!screen_priv->flip_active || window_pixmap != screen_priv->flip_active->pixmap) &&
         window_pixmap != present_flip_pending_pixmap(screen))
         return FALSE;
 
@@ -587,9 +577,9 @@ present_execute(present_vblank_ptr vblank, uint64_t ust, uint64_t crtc_msc)
                  *  1) Restore previous flip window pixmap
                  *  2) Set current flip window pixmap to the new pixmap
                  */
-                if (screen_priv->flip_window && screen_priv->flip_window != window)
-                    present_set_tree_pixmap(screen_priv->flip_window,
-                                            screen_priv->flip_pixmap,
+                if (screen_priv->flip_active && screen_priv->flip_active->window != window)
+                    present_set_tree_pixmap(screen_priv->flip_active->window,
+                                            screen_priv->flip_active->pixmap,
                                             (*screen->GetScreenPixmap)(screen));
                 present_set_tree_pixmap(vblank->window, NULL, vblank->pixmap);
                 present_set_tree_pixmap(screen->root, NULL, vblank->pixmap);
@@ -624,7 +614,7 @@ present_execute(present_vblank_ptr vblank, uint64_t ust, uint64_t crtc_msc)
 
             /* Check current flip
              */
-            if (window == screen_priv->flip_window)
+            if (screen_priv->flip_active && window == screen_priv->flip_active->window)
                 present_unflip(screen);
         }
 
