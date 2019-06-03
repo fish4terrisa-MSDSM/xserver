@@ -123,7 +123,7 @@ present_wnmd_clear_window_flip(WindowPtr window)
     }
 
     xorg_list_for_each_entry_safe(vblank, tmp, &window_priv->idle_queue, event_queue) {
-        present_pixmap_idle(vblank->pixmap, vblank->window, vblank->serial, vblank->idle_fence);
+        present_pixmap_idle(vblank);
         /* The pixmap will be destroyed by freeing the window resources. */
         vblank->pixmap = NULL;
         present_vblank_destroy(vblank);
@@ -131,7 +131,7 @@ present_wnmd_clear_window_flip(WindowPtr window)
 
     vblank = window_priv->flip_active;
     if (vblank) {
-        present_pixmap_idle(vblank->pixmap, vblank->window, vblank->serial, vblank->idle_fence);
+        present_pixmap_idle(vblank);
         present_vblank_destroy(vblank);
     }
     window_priv->flip_active = NULL;

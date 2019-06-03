@@ -190,7 +190,7 @@ present_vblank_scrap(present_vblank_ptr vblank)
                   vblank->pixmap->drawable.id, vblank->window->drawable.id,
                   vblank->crtc));
 
-    present_pixmap_idle(vblank->pixmap, vblank->window, vblank->serial, vblank->idle_fence);
+    present_pixmap_idle(vblank);
     present_fence_destroy(vblank->idle_fence);
     dixDestroyPixmap(vblank->pixmap, vblank->pixmap->drawable.id);
 

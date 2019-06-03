@@ -97,7 +97,7 @@ present_wnmd_flip_try_ready(WindowPtr window)
 static void
 present_wnmd_free_idle_vblank(present_vblank_ptr vblank)
 {
-    present_pixmap_idle(vblank->pixmap, vblank->window, vblank->serial, vblank->idle_fence);
+    present_pixmap_idle(vblank);
     present_vblank_destroy(vblank);
 }
 
