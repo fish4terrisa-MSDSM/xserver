@@ -154,6 +154,7 @@ present_vblank_create(WindowPtr window,
     vblank->num_notifies = num_notifies;
     vblank->has_suboptimal = (options & PresentOptionSuboptimal);
     vblank->flip_idler = FALSE;
+    vblank->queued = TRUE;
 
     *target_msc = present_vblank_configure_flip(vblank, options, capabilities, crtc_msc);
 

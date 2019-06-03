@@ -630,7 +630,7 @@ present_wnmd_pixmap(WindowPtr window,
         return BadAlloc;
 
     xorg_list_append(&vblank->event_queue, &window_priv->exec_queue);
-    vblank->queued = TRUE;
+
     if (crtc_msc < target_msc) {
         if (present_wnmd_queue_vblank(screen, window, target_crtc, vblank->event_id, target_msc) == Success) {
             return Success;
