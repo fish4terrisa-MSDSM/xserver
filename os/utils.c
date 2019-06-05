@@ -527,6 +527,9 @@ UseMsg(void)
         ("-deferglyphs [none|all|16] defer loading of [no|all|16-bit] glyphs\n");
     ErrorF("-f #                   bell base (0-100)\n");
     ErrorF("-fp string             default font path\n");
+#ifdef __linux__
+    ErrorF("-ftrace                turns on Ftrace marking\n");
+#endif
     ErrorF("-help                  prints message with these options\n");
     ErrorF("+iglx                  Allow creating indirect GLX contexts\n");
     ErrorF("-iglx                  Prohibit creating indirect GLX contexts (default)\n");
@@ -779,6 +782,11 @@ ProcessCommandLine(int argc, char *argv[])
             else
                 UseMsg();
         }
+#ifdef __linux__
+        else if (strcmp(argv[i], "-ftrace") == 0) {
+            ftrace_enable(TRUE);
+        }
+#endif
         else if (strcmp(argv[i], "-help") == 0) {
             UseMsg();
             exit(0);

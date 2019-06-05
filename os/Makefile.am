@@ -16,6 +16,7 @@ libos_la_SOURCES = 	\
 	backtrace.c	\
 	client.c	\
 	connection.c	\
+	ftrace.c	\
 	inputthread.c	\
 	io.c		\
 	mitauth.c	\

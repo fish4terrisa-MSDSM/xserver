@@ -330,4 +330,5 @@ OsCleanup(Bool terminating)
     if (terminating) {
         UnlockServer();
     }
+    ftrace_enable(FALSE);
 }

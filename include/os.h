@@ -607,6 +607,21 @@ extern _X_EXPORT int
 timingsafe_memcmp(const void *b1, const void *b2, size_t len);
 #endif
 
+extern _X_EXPORT Bool
+ftrace_enable(Bool enable);
+typedef void (*FtracePrintProcPtr)(const char *f, ...);
+extern _X_EXPORT FtracePrintProcPtr
+ftrace_print
+_X_ATTRIBUTE_PRINTF(1, 2);
+typedef void (*FtracePrintCtxBeginProcPtr)(unsigned long ctx, const char *f, ...);
+extern _X_EXPORT FtracePrintCtxBeginProcPtr
+ftrace_print_begin
+_X_ATTRIBUTE_PRINTF(2, 3);
+typedef void (*FtracePrintCtxEndProcPtr)(unsigned long ctx, const char *f, ...);
+extern _X_EXPORT FtracePrintCtxEndProcPtr
+ftrace_print_end
+_X_ATTRIBUTE_PRINTF(2, 3);
+
 /* Logging. */
 typedef enum _LogParameter {
     XLOG_FLUSH,
