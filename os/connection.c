@@ -247,10 +247,10 @@ CreateWellKnownSockets(void)
     /* display is initialized to "0" by main(). It is then set to the display
      * number if specified on the command line. */
 
-    if (NoListenAll) {
-        ListenTransCount = 0;
-    }
-    else if ((displayfd < 0) || explicit_display) {
+    if (NoListenAll)
+        partial = 1;
+
+    if ((displayfd < 0) || explicit_display) {
         if (TryCreateSocket(atoi(display), &partial) &&
             ListenTransCount >= 1)
             if (!PartialNetwork && partial)
