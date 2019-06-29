@@ -60,6 +60,9 @@ else
   if not enable_input_thread and get_option('input_thread') == 'true'
     error('Input thread enabled and PTHREAD_MUTEX_RECURSIVE not found')
   endif
+  if host_machine.system() == 'windows' and get_option('input_thread') == 'auto'
+      enable_input_thread = false
+  endif
 endif
 conf_data.set('HAVE_INPUTTHREAD', enable_input_thread)
 
@@ -152,6 +155,7 @@ conf_data.set('HAVE_SETEUID', cc.has_function('seteuid'))
 conf_data.set('HAVE_SETITIMER', cc.has_function('setitimer'))
 conf_data.set('HAVE_SHMCTL64', cc.has_function('shmctl64'))
 conf_data.set('HAVE_SIGACTION', cc.has_function('sigaction'))
+conf_data.set('HAVE_SIGPROCMASK', cc.has_function('sigprocmask'))
 conf_data.set('HAVE_STRCASECMP', cc.has_function('strcasecmp'))
 conf_data.set('HAVE_STRCASESTR', cc.has_function('strcasestr'))
 conf_data.set('HAVE_STRLCAT', cc.has_function('strlcat', dependencies: libbsd_dep))

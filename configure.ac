@@ -159,7 +159,8 @@ dnl Checks for library functions.
 AC_CHECK_FUNCS([backtrace geteuid getuid issetugid getresuid \
 	getdtablesize getifaddrs getpeereid getpeerucred getprogname getzoneid \
 	mmap posix_fallocate seteuid shmctl64 strncasecmp vasprintf vsnprintf \
-	walkcontext setitimer poll epoll_create1 mkostemp memfd_create])
+	walkcontext setitimer poll epoll_create1 mkostemp memfd_create \
+	sigprocmask])
 AC_CONFIG_LIBOBJ_DIR([os])
 AC_REPLACE_FUNCS([reallocarray strcasecmp strcasestr strlcat strlcpy strndup\
 	timingsafe_memcmp])
@@ -753,7 +754,7 @@ DAMAGEPROTO="damageproto >= 1.1"
 XCMISCPROTO="xcmiscproto >= 1.2.0"
 BIGREQSPROTO="bigreqsproto >= 1.1.0"
 XTRANS="xtrans >= 1.3.5"
-PRESENTPROTO="presentproto >= 1.1"
+PRESENTPROTO="presentproto >= 1.2"
 
 dnl List of libraries that require a specific version
 LIBAPPLEWM="applewm >= 1.4"
@@ -790,6 +791,11 @@ THREAD_DEFAULT=no
 if test "x$HAVE_RECURSIVE_MUTEX" = "xyes" ; then
 	THREAD_DEFAULT=yes
 fi
+
+case $host_os in
+	mingw*) THREAD_DEFAULT=no  ;;
+	*)
+esac
 
 AC_ARG_ENABLE(input-thread, AS_HELP_STRING([--enable-input-thread],
 	     [Enable input threads]),
@@ -2075,7 +2081,7 @@ if test "x$XWIN" = xyes; then
 	AC_DEFINE_UNQUOTED(__VENDORDWEBSUPPORT__, ["$VENDOR_WEB"], [Vendor web address for support])
 	AC_CHECK_TOOL(WINDRES, windres)
 
-	PKG_CHECK_MODULES([XWINMODULES],[x11 xdmcp xau xfixes x11-xcb xcb-aux xcb-image xcb-ewmh xcb-icccm])
+	PKG_CHECK_MODULES([XWINMODULES],[x11 xau xdmcp xfixes x11-xcb xcb-aux xcb-composite xcb-image xcb-ewmh xcb-icccm])
 
 	if test "x$WINDOWSDRI" = xauto; then
 		PKG_CHECK_EXISTS([windowsdriproto], [WINDOWSDRI=yes], [WINDOWSDRI=no])

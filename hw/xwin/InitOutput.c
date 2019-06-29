@@ -716,6 +716,13 @@ winUseMsg(void)
            "\tthe updated region when num_boxes, or more, are in the\n"
            "\tupdated region.\n");
 
+    ErrorF("-[no]compositealpha\n"
+           "\tX windows with per-pixel alpha are composited into the Windows desktop.\n");
+    ErrorF("-[no]compositewm\n"
+           "\tUse the Composite extension to keep a bitmap image of each top-level\n"
+           "\tX window, so window contents which are occluded show correctly in\n"
+           "\ttask bar and task switcher previews.\n");
+
 #ifdef XWIN_XF86CONFIG
     ErrorF("-config\n" "\tSpecify a configuration file.\n");
 
@@ -798,7 +805,7 @@ winUseMsg(void)
            "\tSpecify an optional refresh rate to use in fullscreen mode\n"
            "\twith a DirectDraw engine.\n");
 
-    ErrorF("-resize=none|scrollbars|randr"
+    ErrorF("-resize=none|scrollbars|randr\n"
            "\tIn windowed mode, [don't] allow resizing of the window. 'scrollbars'\n"
            "\tmode gives the window scrollbars as needed, 'randr' mode uses the RANR\n"
            "\textension to resize the X screen.  'randr' is the default.\n");
@@ -974,8 +981,7 @@ InitOutput(ScreenInfo * pScreenInfo, int argc, char *argv[])
           for (iMonitor = 1; ; iMonitor++)
             {
               struct GetMonitorInfoData data;
-              QueryMonitor(iMonitor, &data);
-              if (data.bMonitorSpecifiedExists)
+              if (QueryMonitor(iMonitor, &data))
                 {
                   MONITORINFO mi;
                   mi.cbSize = sizeof(MONITORINFO);
