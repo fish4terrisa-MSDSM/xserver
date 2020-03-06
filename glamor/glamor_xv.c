@@ -312,15 +312,13 @@ glamor_xv_query_image_attributes(int id,
     switch (id) {
     case FOURCC_YV12:
     case FOURCC_I420:
-        *w = ALIGN(*w, 2);
-        *h = ALIGN(*h, 2);
-        size = ALIGN(*w, 4);
+        size = *w;
         if (pitches)
             pitches[0] = size;
         size *= *h;
         if (offsets)
             offsets[1] = size;
-        tmp = ALIGN(*w >> 1, 4);
+        tmp = *w / 2;
         if (pitches)
             pitches[1] = pitches[2] = tmp;
         tmp *= (*h >> 1);
@@ -679,12 +677,11 @@ glamor_xv_put_image(glamor_port_private *port_priv,
     switch (id) {
     case FOURCC_YV12:
     case FOURCC_I420:
-        srcPitch = ALIGN(width, 4);
-        srcPitch2 = ALIGN(width >> 1, 4);
-        s2offset = srcPitch * height;
-        s3offset = s2offset + (srcPitch2 * ((height + 1) >> 1));
-        s2offset += ((top >> 1) * srcPitch2);
-        s3offset += ((top >> 1) * srcPitch2);
+        srcPitch = width;
+        srcPitch2 = width >> 1;
+        s2offset = width * height;
+        s3offset = s2offset + width * height / 4;
+
         if (id == FOURCC_YV12) {
             tmp = s2offset;
             s2offset = s3offset;
@@ -694,16 +691,16 @@ glamor_xv_put_image(glamor_port_private *port_priv,
         full_box.x1 = 0;
         full_box.y1 = 0;
         full_box.x2 = width;
-        full_box.y2 = nlines;
+        full_box.y2 = height;
 
         half_box.x1 = 0;
         half_box.y1 = 0;
         half_box.x2 = width >> 1;
-        half_box.y2 = (nlines + 1) >> 1;
+        half_box.y2 = height >> 1;
 
         glamor_upload_boxes(port_priv->src_pix[0], &full_box, 1,
                             0, 0, 0, 0,
-                            buf + (top * srcPitch), srcPitch);
+                            buf, srcPitch);
 
         glamor_upload_boxes(port_priv->src_pix[1], &half_box, 1,
                             0, 0, 0, 0,
