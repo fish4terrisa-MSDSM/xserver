@@ -771,7 +771,6 @@ glamor_set_normalize_tcoords_generic(PixmapPtr pixmap,
 static Bool
 glamor_render_format_is_supported(PicturePtr picture)
 {
-    PictFormatShort storage_format;
     glamor_screen_private *glamor_priv;
 
     /* Source-only pictures should always work */
@@ -779,20 +778,13 @@ glamor_render_format_is_supported(PicturePtr picture)
         return TRUE;
 
     glamor_priv = glamor_get_screen_private(picture->pDrawable->pScreen);
-    storage_format =
-        glamor_priv->formats[picture->pDrawable->depth].render_format;
 
-    switch (picture->format) {
-    case PICT_a2r10g10b10:
-        return storage_format == PICT_x2r10g10b10;
-    case PICT_a8r8g8b8:
-    case PICT_x8r8g8b8:
-        return storage_format == PICT_a8r8g8b8 || storage_format == PICT_x8r8g8b8;
-    case PICT_a1r5g5b5:
-        return storage_format == PICT_x1r5g5b5;
-    default:
-        return picture->format == storage_format;
-    }
+    for (int i = 0; i < glamor_priv->nformats; i++)
+        if ((glamor_priv->formats[i].render_format == picture->format)
+             && (glamor_priv->formats[i].depth == picture->pDrawable->depth))
+            return true;
+
+    return false;
 }
 
 static Bool
@@ -901,7 +893,7 @@ glamor_composite_choose_shader(CARD8 op,
     }
 
     if (dest_pixmap->drawable.bitsPerPixel <= 8 &&
-        glamor_priv->formats[8].format == GL_RED) {
+        glamor_format_for_depth(screen, 8)->format == GL_RED) {
         key.dest_swizzle = SHADER_DEST_SWIZZLE_ALPHA_TO_RED;
     } else {
         key.dest_swizzle = SHADER_DEST_SWIZZLE_DEFAULT;

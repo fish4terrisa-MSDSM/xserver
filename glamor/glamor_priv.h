@@ -194,6 +194,7 @@ struct glamor_saved_procs {
     ScreenBlockHandlerProcPtr block_handler;
 };
 
+#define MAX_FORMATS 33
 typedef struct glamor_screen_private {
     Bool is_gles;
     int glsl_version;
@@ -215,7 +216,8 @@ typedef struct glamor_screen_private {
     Bool can_copyplane;
     int max_fbo_size;
 
-    struct glamor_format formats[33];
+    struct glamor_format formats[MAX_FORMATS];
+    int nformats;
     struct glamor_format cbcr_format;
 
     /* glamor point shader */
@@ -340,6 +342,7 @@ typedef struct glamor_pixmap_clipped_regions {
 typedef struct glamor_pixmap_private {
     glamor_pixmap_type_t type;
     enum glamor_fbo_state gl_fbo;
+    const struct glamor_format *fmt;
     /**
      * If devPrivate.ptr is non-NULL (meaning we're within
      * glamor_prepare_access), determies whether we should re-upload
@@ -554,8 +557,12 @@ void glamor_pixmap_destroy_fbo(PixmapPtr pixmap);
 Bool glamor_pixmap_fbo_fixup(ScreenPtr screen, PixmapPtr pixmap);
 void glamor_pixmap_clear_fbo(glamor_screen_private *glamor_priv, glamor_pixmap_fbo *fbo,
                              const struct glamor_format *pixmap_format);
+PixmapPtr glamor_create_pixmap_fmt(ScreenPtr screen, int w, int h, int depth,
+                                   unsigned int usage, CARD32 pixmap_fmt);
 
 const struct glamor_format *glamor_format_for_pixmap(PixmapPtr pixmap);
+const struct glamor_format *glamor_format_for_depth(ScreenPtr screen, int depth);
+const struct glamor_format *glamor_format_for_render_format(ScreenPtr screen, CARD32 fmt);
 
 /* Return whether 'picture' is alpha-only */
 static inline Bool glamor_picture_is_alpha(PicturePtr picture)
@@ -569,7 +576,7 @@ glamor_picture_red_is_alpha(PicturePtr picture)
 {
     /* True when the picture is alpha only and the screen is using GL_RED for alpha pictures */
     return glamor_picture_is_alpha(picture) &&
-        glamor_get_screen_private(picture->pDrawable->pScreen)->formats[8].format == GL_RED;
+        glamor_format_for_depth(picture->pDrawable->pScreen, 8)->format == GL_RED;
 }
 
 void glamor_bind_texture(glamor_screen_private *glamor_priv,

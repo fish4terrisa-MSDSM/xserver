@@ -116,14 +116,13 @@ glamor_set_color_depth(ScreenPtr      pScreen,
                        CARD32         pixel,
                        GLint          uniform)
 {
-    glamor_screen_private *glamor_priv = glamor_get_screen_private(pScreen);
     float       color[4];
 
     glamor_get_rgba_from_pixel(pixel,
                                &color[0], &color[1], &color[2], &color[3],
-                               glamor_priv->formats[depth].render_format);
+                               glamor_format_for_depth(pScreen, depth)->render_format);
 
-    if ((depth <= 8) && glamor_priv->formats[8].format == GL_RED)
+    if ((depth <= 8) && glamor_format_for_depth(pScreen, depth)->format == GL_RED)
       color[0] = color[3];
 
     glUniform4fv(uniform, 1, color);

@@ -131,6 +131,25 @@ static const glamor_facet glamor_facet_xv_planar_3 = {
                 ),
 };
 
+static const glamor_facet glamor_facet_xv_rgb24_raw = {
+    .name = "xv_rgb",
+
+    .version = 120,
+
+    .source_name = "v_texcoord0",
+    .vs_vars = ("attribute vec2 position;\n"
+                "attribute vec2 v_texcoord0;\n"
+                "varying vec2 tcs;\n"),
+    .vs_exec = (GLAMOR_POS(gl_Position, position)
+                "        tcs = v_texcoord0;\n"),
+
+    .fs_vars = ("uniform sampler2D sampler;\n"
+                "varying vec2 tcs;\n"),
+    .fs_exec = (
+                "        gl_FragColor = texture2D(sampler, tcs);\n"
+                ),
+};
+
 #define MAKE_ATOM(a) MakeAtom(a, sizeof(a) - 1, TRUE)
 
 XvAttributeRec glamor_xv_attributes[] = {
@@ -150,6 +169,7 @@ XvImageRec glamor_xv_images[] = {
     XVIMAGE_YV12,
     XVIMAGE_I420,
     XVIMAGE_NV12,
+    XVIMAGE_RGB24,
     XVIMAGE_UYVY,
 };
 int glamor_xv_num_images = ARRAY_SIZE(glamor_xv_images);
@@ -169,6 +189,9 @@ glamor_init_xv_shader(ScreenPtr screen, glamor_port_private *port_priv, int id)
     case FOURCC_NV12:
         glamor_facet_xv_planar = &glamor_facet_xv_planar_2;
         break;
+    case FOURCC_RGB24:
+        glamor_facet_xv_planar = &glamor_facet_xv_rgb24_raw;
+        break;
     default:
         break;
     }
@@ -178,19 +201,28 @@ glamor_init_xv_shader(ScreenPtr screen, glamor_port_private *port_priv, int id)
                          glamor_facet_xv_planar, NULL, NULL, NULL);
 
     glUseProgram(port_priv->xv_prog.prog);
-    sampler_loc = glGetUniformLocation(port_priv->xv_prog.prog, "y_sampler");
-    glUniform1i(sampler_loc, 0);
-    sampler_loc = glGetUniformLocation(port_priv->xv_prog.prog, "u_sampler");
-    glUniform1i(sampler_loc, 1);
 
     switch (id) {
     case FOURCC_YV12:
     case FOURCC_I420:
     case FOURCC_UYVY:
+        sampler_loc = glGetUniformLocation(port_priv->xv_prog.prog, "y_sampler");
+        glUniform1i(sampler_loc, 0);
+        sampler_loc = glGetUniformLocation(port_priv->xv_prog.prog, "u_sampler");
+        glUniform1i(sampler_loc, 1);
         sampler_loc = glGetUniformLocation(port_priv->xv_prog.prog, "v_sampler");
         glUniform1i(sampler_loc, 2);
         break;
     case FOURCC_NV12:
+        glUseProgram(port_priv->xv_prog.prog);
+        sampler_loc = glGetUniformLocation(port_priv->xv_prog.prog, "y_sampler");
+        glUniform1i(sampler_loc, 0);
+        sampler_loc = glGetUniformLocation(port_priv->xv_prog.prog, "u_sampler");
+        glUniform1i(sampler_loc, 1);
+        break;
+    case FOURCC_RGB24:
+        sampler_loc = glGetUniformLocation(port_priv->xv_prog.prog, "sampler");
+        glUniform1i(sampler_loc, 0);
         break;
     default:
         break;
@@ -312,7 +344,15 @@ glamor_xv_query_image_attributes(int id,
         tmp *= (*h >> 1);
         size += tmp;
         break;
-	case FOURCC_UYVY:
+    case FOURCC_RGB24:
+        size = *w * 3;
+        if(pitches)
+            pitches[0] = size;
+        if(offsets)
+            offsets[0] = 0;
+        size *= *h;
+        break;
+    case FOURCC_UYVY:
         //Athough we internally making 3 planes, uyvy is transferred as single one
         size = *w * 2;
         if (pitches)
@@ -408,17 +448,17 @@ glamor_xv_render(glamor_port_private *port_priv, int id)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, src_pixmap_priv[1]->fbo->tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
     switch (id) {
     case FOURCC_YV12:
     case FOURCC_I420:
     case FOURCC_UYVY:
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, src_pixmap_priv[1]->fbo->tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, src_pixmap_priv[2]->fbo->tex);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -427,6 +467,14 @@ glamor_xv_render(glamor_port_private *port_priv, int id)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         break;
     case FOURCC_NV12:
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, src_pixmap_priv[1]->fbo->tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        break;
+    case FOURCC_RGB24:
         break;
     default:
         break;
@@ -564,37 +612,54 @@ glamor_xv_put_image(glamor_port_private *port_priv,
             if (port_priv->src_pix[i])
                 glamor_destroy_pixmap(port_priv->src_pix[i]);
 
-        port_priv->src_pix[0] =
-            glamor_create_pixmap(pScreen, width, height, 8,
-                                 GLAMOR_CREATE_FBO_NO_FBO);
-
         switch (id) {
         case FOURCC_YV12:
         case FOURCC_I420:
+            port_priv->src_pix[0] =
+                glamor_create_pixmap(pScreen, width, height, 8,
+                                 GLAMOR_CREATE_FBO_NO_FBO);
+
             port_priv->src_pix[1] =
                 glamor_create_pixmap(pScreen, width >> 1, height >> 1, 8,
                                      GLAMOR_CREATE_FBO_NO_FBO);
             port_priv->src_pix[2] =
                 glamor_create_pixmap(pScreen, width >> 1, height >> 1, 8,
                                      GLAMOR_CREATE_FBO_NO_FBO);
-            if (!port_priv->src_pix[2])
+            if (!port_priv->src_pix[1] || !port_priv->src_pix[2])
                 return BadAlloc;
             break;
         case FOURCC_NV12:
+            port_priv->src_pix[0] =
+                glamor_create_pixmap(pScreen, width, height, 8,
+	                                 GLAMOR_CREATE_FBO_NO_FBO);
             port_priv->src_pix[1] =
                 glamor_create_pixmap(pScreen, width >> 1, height >> 1, 16,
                                      GLAMOR_CREATE_FBO_NO_FBO |
                                      GLAMOR_CREATE_FORMAT_CBCR);
             port_priv->src_pix[2] = NULL;
+
+            if (!port_priv->src_pix[1])
+                return BadAlloc;
+            break;
+        case FOURCC_RGB24:
+            port_priv->src_pix[0] =
+                glamor_create_pixmap_fmt(pScreen, width, height, 24,
+                                     GLAMOR_CREATE_FBO_NO_FBO, PICT_b8g8r8);
+            port_priv->src_pix[1] = NULL;
+            port_priv->src_pix[2] = NULL;
             break;
         case FOURCC_UYVY:
+            port_priv->src_pix[0] =
+                glamor_create_pixmap(pScreen, width, height, 8,
+                                     GLAMOR_CREATE_FBO_NO_FBO);
+
             port_priv->src_pix[1] =
                 glamor_create_pixmap(pScreen, width / 2, height, 8,
                                      GLAMOR_CREATE_FBO_NO_FBO);
             port_priv->src_pix[2] =
                 glamor_create_pixmap(pScreen, width / 2, height, 8,
                                      GLAMOR_CREATE_FBO_NO_FBO);
-            if (!port_priv->src_pix[2])
+            if (!port_priv->src_pix[1] || !port_priv->src_pix[2])
                 return BadAlloc;
             break;
         default:
@@ -604,7 +669,7 @@ glamor_xv_put_image(glamor_port_private *port_priv,
         port_priv->src_pix_w = width;
         port_priv->src_pix_h = height;
 
-        if (!port_priv->src_pix[0] || !port_priv->src_pix[1])
+        if (!port_priv->src_pix[0])
             return BadAlloc;
     }
 
@@ -670,6 +735,16 @@ glamor_xv_put_image(glamor_port_private *port_priv,
         glamor_upload_boxes(port_priv->src_pix[1], &half_box, 1,
                             0, 0, 0, 0,
                             buf + s2offset, srcPitch);
+        break;
+	case FOURCC_RGB24:
+        srcPitch = width * 3;
+        full_box.x1 = 0;
+        full_box.y1 = 0;
+        full_box.x2 = width;
+        full_box.y2 = height;
+        glamor_upload_boxes(port_priv->src_pix[0], &full_box, 1,
+                            0, 0, 0, 0,
+                            buf, srcPitch);
         break;
 	case FOURCC_UYVY:
         srcPitch = width;

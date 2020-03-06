@@ -176,4 +176,23 @@
         XvTopToBottom \
    }
 
+#define FOURCC_RGB24 0x34324752
+#define XVIMAGE_RGB24 \
+   { \
+        FOURCC_RGB24, \
+        XvRGB, \
+        LSBFirst, \
+        {'R','G','2','4', \
+         0x00,0x00,0x00,0x10,0x80,0x00,0x00,0xAA,0x00,0x38,0x9B,0x71}, \
+        24, \
+        XvPlanar, \
+        1, \
+        24, 0xff0000, 0xff00, 0xff, \
+        0, 0, 0, \
+        0, 0, 0, \
+        0, 0, 0, \
+        {0,0,0,0, \
+         0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, \
+        0 \
+   }
 #endif                          /* _XF86_FOURCC_H_ */

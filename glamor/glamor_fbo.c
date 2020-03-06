@@ -126,6 +126,10 @@ _glamor_create_tex(glamor_screen_private *glamor_priv,
     const struct glamor_format *f = glamor_format_for_pixmap(pixmap);
     unsigned int tex;
 
+    /* returns false if format is not supported */
+    if (f == NULL)
+        return 0;
+
     glamor_make_current(glamor_priv);
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -332,6 +336,14 @@ glamor_pixmap_ensure_fbo(PixmapPtr pixmap, int flag)
     glamor_priv = glamor_get_screen_private(pixmap->drawable.pScreen);
     pixmap_priv = glamor_get_pixmap_private(pixmap);
     if (pixmap_priv->fbo == NULL) {
+        /* GL doesn't support PICT_a1 (depth = 1) format,
+         * so set format for depth = 8
+         */
+        if (pixmap->drawable.depth == 1)
+            pixmap_priv->fmt = glamor_format_for_depth(pixmap->drawable.pScreen, 8);
+        else
+            pixmap_priv->fmt = glamor_format_for_depth(pixmap->drawable.pScreen,
+                                                       pixmap->drawable.depth);
 
         fbo = glamor_create_fbo(glamor_priv, pixmap, pixmap->drawable.width,
                                 pixmap->drawable.height, flag);

@@ -202,11 +202,24 @@ PixmapPtr
 glamor_create_pixmap(ScreenPtr screen, int w, int h, int depth,
                      unsigned int usage)
 {
+    return glamor_create_pixmap_fmt(screen, w, h, depth, usage,
+                                    GLAMOR_CREATE_DEFAULT_PIXMAP);
+}
+
+PixmapPtr
+glamor_create_pixmap_fmt(ScreenPtr screen, int w, int h, int depth,
+                     unsigned int usage, CARD32 render_fmt)
+{
     PixmapPtr pixmap;
     glamor_pixmap_private *pixmap_priv;
     glamor_screen_private *glamor_priv = glamor_get_screen_private(screen);
     glamor_pixmap_fbo *fbo = NULL;
     int pitch;
+    const struct glamor_format *fmt =
+                            (render_fmt == GLAMOR_CREATE_DEFAULT_PIXMAP)
+                             ? glamor_format_for_depth(screen, depth)
+                             : glamor_format_for_render_format(screen,
+                                                               render_fmt);
 
     if (w > 32767 || h > 32767)
         return NullPixmap;
@@ -216,12 +229,14 @@ glamor_create_pixmap(ScreenPtr screen, int w, int h, int depth,
              w <= glamor_priv->glyph_max_dim &&
              h <= glamor_priv->glyph_max_dim)
          || (w == 0 && h == 0)
-         || !glamor_priv->formats[depth].format))
+         ||  !fmt))
         return fbCreatePixmap(screen, w, h, depth, usage);
     else
         pixmap = fbCreatePixmap(screen, 0, 0, depth, usage);
 
     pixmap_priv = glamor_get_pixmap_private(pixmap);
+
+    pixmap_priv->fmt = fmt;
 
     pixmap_priv->is_cbcr = (usage == GLAMOR_CREATE_FORMAT_CBCR);
 
@@ -445,24 +460,55 @@ glamor_setup_debug_output(ScreenPtr screen)
 }
 
 const struct glamor_format *
+glamor_format_for_render_format(ScreenPtr screen, CARD32 fmt)
+{
+    glamor_screen_private *glamor_priv = glamor_get_screen_private(screen);
+
+    for (int i = 0; i < glamor_priv->nformats; i++)
+        if (glamor_priv->formats[i].render_format == fmt)
+            return &glamor_priv->formats[i];
+
+    return NULL;
+}
+
+const struct glamor_format *
+glamor_format_for_depth(ScreenPtr screen, int depth)
+{
+    glamor_screen_private *glamor_priv = glamor_get_screen_private(screen);
+
+    for (int i = 0; i < glamor_priv->nformats; i++)
+        if (glamor_priv->formats[i].depth == depth)
+            return &glamor_priv->formats[i];
+
+    return NULL;
+}
+
+const struct glamor_format *
 glamor_format_for_pixmap(PixmapPtr pixmap)
 {
     ScreenPtr pScreen = pixmap->drawable.pScreen;
     glamor_screen_private *glamor_priv = glamor_get_screen_private(pScreen);
     glamor_pixmap_private *pixmap_priv = glamor_get_pixmap_private(pixmap);
 
-    if (pixmap_priv->is_cbcr)
-        return &glamor_priv->cbcr_format;
-    else
-        return &glamor_priv->formats[pixmap->drawable.depth];
+    if (!pixmap_priv->fmt) {
+        if (pixmap_priv->is_cbcr)
+            pixmap_priv->fmt = &glamor_priv->cbcr_format;
+        else
+            pixmap_priv->fmt = glamor_format_for_depth(pScreen,
+                                                       pixmap->drawable.depth);
+    }
+
+    return pixmap_priv->fmt;
 }
+
+
 
 static void
 glamor_add_format(ScreenPtr screen, int depth, CARD32 render_format,
                   GLenum internalformat, GLenum format, GLenum type)
 {
     glamor_screen_private *glamor_priv = glamor_get_screen_private(screen);
-    struct glamor_format *f = &glamor_priv->formats[depth];
+    struct glamor_format *f = &glamor_priv->formats[glamor_priv->nformats];
 
     /* If we're trying to run on GLES, make sure that we get the read
      * formats that we're expecting, since glamor_transfer relies on
@@ -513,12 +559,15 @@ glamor_add_format(ScreenPtr screen, int depth, CARD32 render_format,
             return;
         }
     }
-
-    f->depth = depth;
-    f->render_format = render_format;
-    f->internalformat = internalformat;
-    f->format = format;
-    f->type = type;
+    if (glamor_priv->nformats + 1 < MAX_FORMATS)
+    {
+        glamor_priv->nformats++;
+        f->depth = depth;
+        f->render_format = render_format;
+        f->internalformat = internalformat;
+        f->format = format;
+        f->type = type;
+    }
 }
 
 /* Set up the GL format/types that glamor will use for the various depths
@@ -544,6 +593,7 @@ static void
 glamor_setup_formats(ScreenPtr screen)
 {
     glamor_screen_private *glamor_priv = glamor_get_screen_private(screen);
+    glamor_priv->nformats = 0;
 
     /* Prefer r8 textures since they're required by GLES3 and core,
      * only falling back to a8 if we can't do them.
@@ -588,6 +638,9 @@ glamor_setup_formats(ScreenPtr screen)
         glamor_add_format(screen, 32, PICT_a8r8g8b8,
                           GL_RGBA, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
     }
+
+    glamor_add_format(screen, 24, PICT_b8g8r8,
+                      GL_RGB, GL_RGB, GL_UNSIGNED_BYTE);
 
     if (glamor_priv->is_gles) {
         glamor_add_format(screen, 30, PICT_x2b10g10r10,
