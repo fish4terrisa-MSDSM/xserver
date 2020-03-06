@@ -883,6 +883,8 @@ typedef struct {
     int src_pix_w, src_pix_h;
 
     int prev_fmt;
+    uint8_t* uyvy_buf;
+
     glamor_program xv_prog;
 } glamor_port_private;
 

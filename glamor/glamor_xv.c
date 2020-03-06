@@ -149,7 +149,8 @@ Atom glamorBrightness, glamorContrast, glamorSaturation, glamorHue,
 XvImageRec glamor_xv_images[] = {
     XVIMAGE_YV12,
     XVIMAGE_I420,
-    XVIMAGE_NV12
+    XVIMAGE_NV12,
+    XVIMAGE_UYVY,
 };
 int glamor_xv_num_images = ARRAY_SIZE(glamor_xv_images);
 
@@ -162,6 +163,7 @@ glamor_init_xv_shader(ScreenPtr screen, glamor_port_private *port_priv, int id)
     switch (id) {
     case FOURCC_YV12:
     case FOURCC_I420:
+    case FOURCC_UYVY:
         glamor_facet_xv_planar = &glamor_facet_xv_planar_3;
         break;
     case FOURCC_NV12:
@@ -184,6 +186,7 @@ glamor_init_xv_shader(ScreenPtr screen, glamor_port_private *port_priv, int id)
     switch (id) {
     case FOURCC_YV12:
     case FOURCC_I420:
+    case FOURCC_UYVY:
         sampler_loc = glGetUniformLocation(port_priv->xv_prog.prog, "v_sampler");
         glUniform1i(sampler_loc, 2);
         break;
@@ -215,6 +218,11 @@ glamor_xv_free_port_data(glamor_port_private *port_priv)
     }
     RegionUninit(&port_priv->clip);
     RegionNull(&port_priv->clip);
+
+    if(port_priv->uyvy_buf) {
+        free(port_priv->uyvy_buf);
+        port_priv->uyvy_buf = 0;
+    }
 }
 
 int
@@ -303,6 +311,15 @@ glamor_xv_query_image_attributes(int id,
             pitches[1] = pitches[2] = tmp;
         tmp *= (*h >> 1);
         size += tmp;
+        break;
+	case FOURCC_UYVY:
+        //Athough we internally making 3 planes, uyvy is transferred as single one
+        size = *w * 2;
+        if (pitches)
+            pitches[0] = size;
+        if (offsets)
+            offsets[0] = 0;
+        size = size * *h;
         break;
     }
     return size;
@@ -401,6 +418,7 @@ glamor_xv_render(glamor_port_private *port_priv, int id)
     switch (id) {
     case FOURCC_YV12:
     case FOURCC_I420:
+    case FOURCC_UYVY:
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, src_pixmap_priv[2]->fbo->tex);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -526,6 +544,9 @@ glamor_xv_put_image(glamor_port_private *port_priv,
     int top, nlines;
     int s2offset, s3offset, tmp;
     BoxRec full_box, half_box;
+    uint8_t* y_plane = 0;
+    uint8_t* u_plane = 0;
+    uint8_t* v_plane = 0;
 
     s2offset = s3offset = srcPitch2 = 0;
 
@@ -565,6 +586,16 @@ glamor_xv_put_image(glamor_port_private *port_priv,
                                      GLAMOR_CREATE_FBO_NO_FBO |
                                      GLAMOR_CREATE_FORMAT_CBCR);
             port_priv->src_pix[2] = NULL;
+            break;
+        case FOURCC_UYVY:
+            port_priv->src_pix[1] =
+                glamor_create_pixmap(pScreen, width / 2, height, 8,
+                                     GLAMOR_CREATE_FBO_NO_FBO);
+            port_priv->src_pix[2] =
+                glamor_create_pixmap(pScreen, width / 2, height, 8,
+                                     GLAMOR_CREATE_FBO_NO_FBO);
+            if (!port_priv->src_pix[2])
+                return BadAlloc;
             break;
         default:
             return BadMatch;
@@ -639,6 +670,50 @@ glamor_xv_put_image(glamor_port_private *port_priv,
         glamor_upload_boxes(port_priv->src_pix[1], &half_box, 1,
                             0, 0, 0, 0,
                             buf + s2offset, srcPitch);
+        break;
+	case FOURCC_UYVY:
+        srcPitch = width;
+        srcPitch2 = width / 2;
+
+        if(!port_priv->uyvy_buf) {
+            port_priv->uyvy_buf = calloc(1, width * height * 2);
+            if (!port_priv->uyvy_buf)
+                return BadAlloc;
+        }
+        y_plane = port_priv->uyvy_buf;
+        u_plane = y_plane + width * height;
+        v_plane = u_plane + width * height / 2;
+
+        full_box.x1 = 0;
+        full_box.y1 = 0;
+        full_box.x2 = width;
+        full_box.y2 = height;
+
+
+        half_box.x1 = 0;
+        half_box.y1 = 0;
+        half_box.x2 = width / 2;
+        half_box.y2 = height;
+
+        for(int i = 0; i < width * height * 2; i = i + 4){
+            y_plane[i / 2] = buf[i + 1];
+            y_plane[i / 2 + 1] = buf[i + 3];
+            u_plane[i / 4] = buf[i];
+            v_plane[i / 4] = buf[i + 2];
+        }
+
+        glamor_upload_boxes(port_priv->src_pix[0], &full_box, 1,
+                            0, 0, 0, 0,
+                            y_plane, srcPitch);
+
+        glamor_upload_boxes(port_priv->src_pix[1], &half_box, 1,
+                            0, 0, 0, 0,
+                            u_plane, srcPitch2);
+
+        glamor_upload_boxes(port_priv->src_pix[2], &half_box, 1,
+                            0, 0, 0, 0,
+                            v_plane, srcPitch2);
+
         break;
     default:
         return BadMatch;
