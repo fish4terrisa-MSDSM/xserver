@@ -129,7 +129,8 @@ output_handle_mode(void *data, struct wl_output *wl_output, uint32_t flags,
 static inline void
 output_get_new_size(struct xwl_output *xwl_output,
                     Bool need_rotate,
-                    int *height, int *width)
+                    int *x1, int *y1,
+                    int *x2, int *y2)
 {
     int output_width, output_height;
 
@@ -141,11 +142,11 @@ output_get_new_size(struct xwl_output *xwl_output,
         output_height = xwl_output->width;
     }
 
-    if (*width < xwl_output->x + output_width)
-        *width = xwl_output->x + output_width;
+    *x1 = min(*x1, xwl_output->x);
+    *y1 = min(*y1, xwl_output->y);
 
-    if (*height < xwl_output->y + output_height)
-        *height = xwl_output->y + output_height;
+    *x2 = max(*x2, xwl_output->x + output_width);
+    *y2 = max(*y2, xwl_output->y + output_height);
 }
 
 /* Approximate some kind of mmpd (m.m. per dot) of the screen given the outputs
@@ -211,7 +212,8 @@ update_backing_pixmaps(struct xwl_screen *xwl_screen, int width, int height)
 }
 
 static void
-update_screen_size(struct xwl_output *xwl_output, int width, int height)
+update_screen_size(struct xwl_output *xwl_output,
+                   int x, int y, int width, int height)
 {
     struct xwl_screen *xwl_screen = xwl_output->xwl_screen;
     double mmpd;
@@ -219,11 +221,18 @@ update_screen_size(struct xwl_output *xwl_output, int width, int height)
     if (xwl_screen->root_clip_mode == ROOT_CLIP_FULL)
         SetRootClip(xwl_screen->screen, ROOT_CLIP_NONE);
 
-    if (!xwl_screen->rootless && xwl_screen->screen->root)
-        update_backing_pixmaps (xwl_screen, width, height);
+    if (!xwl_screen->rootless) {
+        x = 0;
+        y = 0;
+        if (xwl_screen->screen->root) {
+            update_backing_pixmaps (xwl_screen, width, height);
+        }
+    }
 
     xwl_screen->width = width;
     xwl_screen->height = height;
+    xwl_screen->screen->x = x;
+    xwl_screen->screen->y = y;
     xwl_screen->screen->width = width;
     xwl_screen->screen->height = height;
 
@@ -239,7 +248,7 @@ update_screen_size(struct xwl_output *xwl_output, int width, int height)
     SetRootClip(xwl_screen->screen, xwl_screen->root_clip_mode);
 
     if (xwl_screen->screen->root) {
-        BoxRec box = { 0, 0, width, height };
+        BoxRec box = { x, y, x + width, y + height };
 
         xwl_screen->screen->root->drawable.width = width;
         xwl_screen->screen->root->drawable.height = height;
@@ -533,7 +542,9 @@ apply_output_change(struct xwl_output *xwl_output)
     struct xwl_screen *xwl_screen = xwl_output->xwl_screen;
     struct xwl_output *it;
     int mode_width, mode_height, count;
-    int width = 0, height = 0, has_this_output = 0;
+    int x1 = INT_MAX, y1 = INT_MAX;
+    int x2 = INT_MIN, y2 = INT_MIN;
+    int has_this_output = 0;
     RRModePtr *randr_modes;
     Bool need_rotate;
 
@@ -572,19 +583,20 @@ apply_output_change(struct xwl_output *xwl_output)
         if (it == xwl_output)
             has_this_output = 1;
 
-        output_get_new_size(it, need_rotate, &height, &width);
+        output_get_new_size(it, need_rotate, &x1, &y1, &x2, &y2);
     }
 
     if (!has_this_output) {
         xorg_list_append(&xwl_output->link, &xwl_screen->output_list);
 
         /* we did not check this output for new screen size, do it now */
-        output_get_new_size(xwl_output, need_rotate, &height, &width);
+        output_get_new_size(xwl_output, need_rotate, &x1, &y1, &x2, &y2);
 
 	--xwl_screen->expecting_event;
     }
 
-    update_screen_size(xwl_output, width, height);
+    /* Pretend the screen is placed at (0,0) */
+    update_screen_size(xwl_output, 0, 0, x2 - x1, y2 - y1);
 }
 
 static void
@@ -740,14 +752,23 @@ xwl_output_remove(struct xwl_output *xwl_output)
 {
     struct xwl_output *it;
     struct xwl_screen *xwl_screen = xwl_output->xwl_screen;
-    int width = 0, height = 0;
     Bool need_rotate = (xwl_output->xdg_output == NULL);
 
     xorg_list_del(&xwl_output->link);
 
-    xorg_list_for_each_entry(it, &xwl_screen->output_list, link)
-        output_get_new_size(it, need_rotate, &height, &width);
-    update_screen_size(xwl_output, width, height);
+    if (xorg_list_is_empty(&xwl_screen->output_list)) {
+        update_screen_size(xwl_output, 0, 0, 0, 0);
+    } else {
+        int x1 = INT_MAX, y1 = INT_MAX;
+        int x2 = INT_MIN, y2 = INT_MIN;
+
+        xorg_list_for_each_entry(it, &xwl_screen->output_list, link) {
+            output_get_new_size(it, need_rotate, &x1, &y1, &x2, &y2);
+        }
+
+        /* Pretend the screen is placed at (0,0) */
+        update_screen_size(xwl_output, 0, 0, x2 - x1, y2 - y1);
+    }
 
     RRCrtcDestroy(xwl_output->randr_crtc);
     RROutputDestroy(xwl_output->randr_output);
