@@ -3210,10 +3210,12 @@ InitializeSprite(DeviceIntPtr pDev, WindowPtr pWin)
     pSprite->hot.pScreen = pScreen;
     pSprite->hotPhys.pScreen = pScreen;
     if (pScreen) {
-        pSprite->hotPhys.x = pScreen->width / 2;
-        pSprite->hotPhys.y = pScreen->height / 2;
-        pSprite->hotLimits.x2 = pScreen->width;
-        pSprite->hotLimits.y2 = pScreen->height;
+        pSprite->hotPhys.x = pScreen->x + pScreen->width / 2;
+        pSprite->hotPhys.y = pScreen->y + pScreen->height / 2;
+        pSprite->hotLimits.x1 = pScreen->x;
+        pSprite->hotLimits.y1 = pScreen->y;
+        pSprite->hotLimits.x2 = pScreen->x + pScreen->width;
+        pSprite->hotLimits.y2 = pScreen->y + pScreen->height;
     }
 
     pSprite->hot = pSprite->hotPhys;
@@ -3320,8 +3322,10 @@ UpdateSpriteForScreen(DeviceIntPtr pDev, ScreenPtr pScreen)
 
     pSprite->hotPhys.pScreen = pScreen;
     pSprite->hot = pSprite->hotPhys;
-    pSprite->hotLimits.x2 = pScreen->width;
-    pSprite->hotLimits.y2 = pScreen->height;
+    pSprite->hotLimits.x1 = pScreen->x;
+    pSprite->hotLimits.y1 = pScreen->y;
+    pSprite->hotLimits.x2 = pScreen->x + pScreen->width;
+    pSprite->hotLimits.y2 = pScreen->y + pScreen->height;
     pSprite->win = win;
     pCursor = RefCursor(wCursor(win));
     if (pSprite->current)
