@@ -46,11 +46,26 @@ struct xwl_pointer_warp_emulator {
     struct zwp_locked_pointer_v1 *locked_pointer;
 };
 
+struct xwl_cursor_fake {
+    struct xwl_window *origin;
+    struct zwp_locked_pointer_v1 *locked_pointer;
+    struct xwl_window *parent;
+    struct wl_surface *surface;
+    struct wl_subsurface *subsurface;
+};
+
 struct xwl_cursor {
     void (* update_proc) (struct xwl_cursor *);
     struct wl_surface *surface;
     struct wl_callback *frame_cb;
     Bool needs_update;
+
+    struct {
+        int x;
+        int y;
+    } position;
+
+    struct xwl_cursor_fake *fake;
 };
 
 struct xwl_seat {

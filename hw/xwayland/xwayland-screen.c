@@ -172,7 +172,7 @@ xwl_close_screen(ScreenPtr screen)
     return screen->CloseScreen(screen);
 }
 
-static struct xwl_seat *
+struct xwl_seat *
 xwl_screen_get_default_seat(struct xwl_screen *xwl_screen)
 {
     if (xorg_list_is_empty(&xwl_screen->seat_list))
@@ -344,6 +344,9 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id,
 
         xwl_screen->compositor =
             wl_registry_bind(registry, id, &wl_compositor_interface, request_version);
+    }
+    else if (strcmp(interface, "wl_subcompositor") == 0) {
+        xwl_screen->subcompositor = wl_registry_bind(registry, id, &wl_subcompositor_interface, 1);
     }
     else if (strcmp(interface, "wl_shm") == 0) {
         xwl_screen->shm = wl_registry_bind(registry, id, &wl_shm_interface, 1);

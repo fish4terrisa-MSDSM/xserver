@@ -33,6 +33,7 @@
 #include "mipointer.h"
 
 #include "xwayland-cursor.h"
+#include "xwayland-cursor-fake.h"
 #include "xwayland-input.h"
 #include "xwayland-screen.h"
 #include "xwayland-shm.h"
@@ -135,7 +136,7 @@ static const struct wl_callback_listener frame_listener = {
     frame_callback
 };
 
-static PixmapPtr
+PixmapPtr
 xwl_cursor_get_pixmap(struct xwl_seat *xwl_seat)
 {
     CursorPtr cursor = xwl_seat->x_cursor;
@@ -156,17 +157,20 @@ xwl_cursor_get_pixmap(struct xwl_seat *xwl_seat)
     return pixmap;
 }
 
-static void
-xwl_cursor_send_surface(struct xwl_seat *xwl_seat, struct xwl_cursor *xwl_cursor, PixmapPtr pixmap)
+void
+xwl_cursor_send_surface(struct xwl_seat *xwl_seat, struct xwl_cursor *xwl_cursor, PixmapPtr pixmap,
+                        Bool fake_cursor)
 {
-    wl_surface_attach(xwl_cursor->surface, xwl_shm_pixmap_get_wl_buffer(pixmap), 0, 0);
-    xwl_surface_damage(xwl_seat->xwl_screen, xwl_cursor->surface,
+    struct wl_surface *surface = fake_cursor ? xwl_cursor->fake->surface : xwl_cursor->surface;
+
+    wl_surface_attach(surface, xwl_shm_pixmap_get_wl_buffer(pixmap), 0, 0);
+    xwl_surface_damage(xwl_seat->xwl_screen, surface,
                        0, 0, xwl_seat->x_cursor->bits->width, xwl_seat->x_cursor->bits->height);
 
-    xwl_cursor->frame_cb = wl_surface_frame(xwl_cursor->surface);
+    xwl_cursor->frame_cb = wl_surface_frame(surface);
     wl_callback_add_listener(xwl_cursor->frame_cb, &frame_listener, xwl_cursor);
 
-    wl_surface_commit(xwl_cursor->surface);
+    wl_surface_commit(surface);
 }
 
 void
@@ -201,7 +205,7 @@ xwl_seat_set_cursor(struct xwl_seat *xwl_seat)
                           xwl_seat->x_cursor->bits->xhot,
                           xwl_seat->x_cursor->bits->yhot);
 
-    xwl_cursor_send_surface(xwl_seat, xwl_cursor, pixmap);
+    xwl_cursor_send_surface(xwl_seat, xwl_cursor, pixmap, FALSE);
 }
 
 void
@@ -235,7 +239,7 @@ xwl_tablet_tool_set_cursor(struct xwl_tablet_tool *xwl_tablet_tool)
                                   xwl_seat->x_cursor->bits->xhot,
                                   xwl_seat->x_cursor->bits->yhot);
 
-    xwl_cursor_send_surface(xwl_seat, xwl_cursor, pixmap);
+    xwl_cursor_send_surface(xwl_seat, xwl_cursor, pixmap, FALSE);
 }
 
 static void
@@ -247,8 +251,17 @@ xwl_set_cursor(DeviceIntPtr device,
     Bool cursor_visibility_changed;
 
     xwl_seat = device->public.devicePrivate;
-    if (xwl_seat == NULL)
+
+    if (xwl_seat == NULL) {
+        struct xwl_screen *xwl_screen = xwl_screen_get(screen);
+
+        xwl_seat = xwl_screen_get_default_seat(xwl_screen);
+        if (xwl_seat && xwl_seat->cursor.fake) {
+            xwl_seat->x_cursor = cursor;
+            xwl_cursor_set_fake_cursor(xwl_seat);
+        }
         return;
+    }
 
     cursor_visibility_changed = !!xwl_seat->x_cursor ^ !!cursor;
 
@@ -256,6 +269,14 @@ xwl_set_cursor(DeviceIntPtr device,
 
     if (cursor_visibility_changed)
         xwl_seat_cursor_visibility_changed(xwl_seat);
+
+    if (xwl_seat->cursor.fake) {
+        /* We currently fake the position. So only update that. */
+        xwl_cursor_set_fake_cursor(xwl_seat);
+        return;
+    }
+
+    xwl_cursor_destroy_fake(xwl_seat);
 
     xwl_seat_set_cursor(xwl_seat);
 
@@ -268,6 +289,21 @@ xwl_set_cursor(DeviceIntPtr device,
 static void
 xwl_move_cursor(DeviceIntPtr device, ScreenPtr screen, int x, int y)
 {
+    struct xwl_screen *xwl_screen = xwl_screen_get(screen);
+    struct xwl_seat *xwl_default_seat, *xwl_seat;
+
+    xwl_default_seat = xwl_screen_get_default_seat(xwl_screen);
+
+    xorg_list_for_each_entry(xwl_seat, &xwl_screen->seat_list, link) {
+        if (xwl_seat->cursor.position.x == x && xwl_seat->cursor.position.y == y) {
+            /* The current cursor position in X is in sync with the one in the Wayland
+             * compositor. No need to fake the cursor position. */
+            xwl_cursor_destroy_fake(xwl_default_seat);
+            return;
+        }
+    }
+
+    xwl_cursor_fake_position(xwl_default_seat, x, y);
 }
 
 static Bool

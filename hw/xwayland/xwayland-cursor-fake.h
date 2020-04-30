@@ -1,6 +1,5 @@
 /*
- * Copyright © 2014 Intel Corporation
- * Copyright © 2011 Kristian Høgsberg
+ * Copyright © 2020 Roman Gilg
  *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without
@@ -24,18 +23,19 @@
  * SOFTWARE.
  */
 
-#ifndef XWAYLAND_CURSOR_H
-#define XWAYLAND_CURSOR_H
+#ifndef XWAYLAND_CURSOR_FAKE_H
+#define XWAYLAND_CURSOR_FAKE_H
 
 #include <xwayland-config.h>
-#include <xwayland-types.h>
 #include <xwayland-input.h>
 
-void xwl_tablet_tool_set_cursor(struct xwl_tablet_tool *tool);
-void xwl_seat_set_cursor(struct xwl_seat *xwl_seat);
-Bool xwl_screen_init_cursor(struct xwl_screen *xwl_screen);
-PixmapPtr xwl_cursor_get_pixmap(struct xwl_seat *xwl_seat);
-void xwl_cursor_send_surface(struct xwl_seat *xwl_seat, struct xwl_cursor *xwl_cursor,
-                             PixmapPtr pixmap, Bool fake_cursor);
+#include <dix.h>
 
-#endif /* XWAYLAND_CURSOR_H */
+#include "xwayland-types.h"
+
+void xwl_cursor_fake_update_focus(struct xwl_screen *xwl_screen, WindowPtr window);
+void xwl_cursor_destroy_fake(struct xwl_seat *xwl_seat);
+void xwl_cursor_set_fake_cursor(struct xwl_seat *xwl_seat);
+void xwl_cursor_fake_position(struct xwl_seat *xwl_seat, int x, int y);
+
+#endif /* XWAYLAND_CURSOR_FAKE_H */

@@ -77,6 +77,7 @@ struct xwl_screen {
     struct wl_registry *registry;
     struct wl_registry *input_registry;
     struct wl_compositor *compositor;
+    struct wl_subcompositor *subcompositor;
     struct zwp_tablet_manager_v2 *tablet_manager;
     struct wl_shm *shm;
     struct xdg_wm_base *xdg_wm_base;
@@ -130,5 +131,6 @@ void xwl_screen_roundtrip (struct xwl_screen *xwl_screen);
 void xwl_surface_damage(struct xwl_screen *xwl_screen,
                         struct wl_surface *surface,
                         int32_t x, int32_t y, int32_t width, int32_t height);
+struct xwl_seat *xwl_screen_get_default_seat(struct xwl_screen *xwl_screen);
 
 #endif /* XWAYLAND_SCREEN_H */

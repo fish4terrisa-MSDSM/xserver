@@ -36,6 +36,7 @@
 #include "propertyst.h"
 
 #include "xwayland-types.h"
+#include "xwayland-cursor-fake.h"
 #include "xwayland-input.h"
 #include "xwayland-present.h"
 #include "xwayland-screen.h"
@@ -579,6 +580,8 @@ xwl_unrealize_window(WindowPtr window)
             xwl_seat->pointer_warp_emulator->locked_window &&
             xwl_seat->pointer_warp_emulator->locked_window->window == window)
             xwl_seat_destroy_pointer_warp_emulator(xwl_seat);
+        if (xwl_seat->cursor.fake && xwl_seat->cursor.fake->origin->window == window)
+            xwl_cursor_destroy_fake(xwl_seat);
         xwl_seat_clear_touch(xwl_seat, window);
     }
 

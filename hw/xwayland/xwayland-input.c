@@ -40,6 +40,7 @@
 #include <misc.h>
 
 #include "xwayland-cursor.h"
+#include "xwayland-cursor-fake.h"
 #include "xwayland-input.h"
 #include "xwayland-window.h"
 #include "xwayland-screen.h"
@@ -377,6 +378,9 @@ xwl_tablet_proc(DeviceIntPtr device, int what)
 }
 
 static void
+xwl_seat_update_cursor(struct xwl_cursor *xwl_cursor);
+
+static void
 pointer_handle_enter(void *data, struct wl_pointer *pointer,
                      uint32_t serial, struct wl_surface *surface,
                      wl_fixed_t sx_w, wl_fixed_t sy_w)
@@ -439,7 +443,7 @@ pointer_handle_enter(void *data, struct wl_pointer *pointer,
     if (xwl_seat->cursor.frame_cb) {
         wl_callback_destroy(xwl_seat->cursor.frame_cb);
         xwl_seat->cursor.frame_cb = NULL;
-        xwl_seat_set_cursor(xwl_seat);
+        xwl_seat_update_cursor(&xwl_seat->cursor);
     }
 
     if (xwl_seat->pointer_warp_emulator) {
@@ -455,6 +459,8 @@ pointer_handle_leave(void *data, struct wl_pointer *pointer,
 {
     struct xwl_seat *xwl_seat = data;
     DeviceIntPtr dev = xwl_seat->pointer;
+
+    xwl_cursor_destroy_fake(xwl_seat);
 
     xwl_seat->xwl_screen->serial = serial;
 
@@ -508,6 +514,9 @@ dispatch_pointer_motion_event(struct xwl_seat *xwl_seat)
         } else {
             miPointerGetPosition(xwl_seat->pointer, &x, &y);
         }
+
+        xwl_seat->cursor.position.x = x;
+        xwl_seat->cursor.position.y = y;
 
         valuator_mask_zero(&mask);
         if (xwl_seat->pending_pointer_event.has_relative) {
@@ -691,6 +700,10 @@ relative_pointer_handle_relative_motion(void *data,
 
     if (!xwl_seat->focus_window)
         return;
+
+    /* A relative motion means a real pointer device was moved and faking the
+     * position should be given up. */
+    xwl_cursor_destroy_fake(xwl_seat);
 
     if (wl_proxy_get_version((struct wl_proxy *) xwl_seat->wl_pointer) < 5)
         dispatch_pointer_motion_event(xwl_seat);
@@ -1355,7 +1368,10 @@ static void
 xwl_seat_update_cursor(struct xwl_cursor *xwl_cursor)
 {
     struct xwl_seat *xwl_seat = wl_container_of(xwl_cursor, xwl_seat, cursor);
-    xwl_seat_set_cursor(xwl_seat);
+    if (xwl_cursor->fake)
+        xwl_cursor_set_fake_cursor(xwl_seat);
+    else
+        xwl_seat_set_cursor(xwl_seat);
 }
 
 static void
@@ -2566,6 +2582,8 @@ xwl_xy_to_window(ScreenPtr screen, SpritePtr sprite, int x, int y)
     xwl_screen->XYToWindow = screen->XYToWindow;
     screen->XYToWindow = xwl_xy_to_window;
 
+    xwl_cursor_fake_update_focus(xwl_screen, ret);
+
     /* If the device controlling the sprite has left the Wayland surface but
      * the DIX still finds the pointer within the X11 window, it means that
      * the pointer has crossed to another native Wayland window, in this
@@ -2828,12 +2846,18 @@ xwl_seat_maybe_lock_on_hidden_cursor(struct xwl_seat *xwl_seat)
 void
 xwl_seat_cursor_visibility_changed(struct xwl_seat *xwl_seat)
 {
-    if (xwl_seat->pointer_warp_emulator && xwl_seat->x_cursor != NULL) {
+    if (xwl_seat->x_cursor == NULL) {
+        /* X Cursor is hidden. Any cursor fake becomes unneeded. */
+        xwl_cursor_destroy_fake(xwl_seat);
+
+        if (xwl_seat->cursor_confinement_window)
+            /* If the cursor goes hidden as is confined, lock it for
+             * relative motion to work. */
+            xwl_seat_maybe_lock_on_hidden_cursor(xwl_seat);
+
+    } else if (xwl_seat->pointer_warp_emulator) {
+        /* X Cursor is shown. Warping the cursor is not allowed any more. */
         xwl_seat_destroy_pointer_warp_emulator(xwl_seat);
-    } else if (!xwl_seat->x_cursor && xwl_seat->cursor_confinement_window) {
-        /* If the cursor goes hidden as is confined, lock it for
-         * relative motion to work. */
-        xwl_seat_maybe_lock_on_hidden_cursor(xwl_seat);
     }
 }
 
