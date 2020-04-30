@@ -135,13 +135,32 @@ static const struct wl_callback_listener frame_listener = {
     frame_callback
 };
 
+static PixmapPtr
+xwl_cursor_get_pixmap(struct xwl_seat *xwl_seat)
+{
+    CursorPtr cursor = xwl_seat->x_cursor;
+    PixmapPtr pixmap;
+    int stride;
+
+    pixmap = dixGetPrivate(&cursor->devPrivates, &xwl_cursor_private_key);
+    if (!pixmap)
+        return NULL;
+
+    stride = cursor->bits->width * 4;
+    if (cursor->bits->argb)
+        memcpy(pixmap->devPrivate.ptr,
+               cursor->bits->argb, cursor->bits->height * stride);
+    else
+        expand_source_and_mask(cursor, pixmap->devPrivate.ptr);
+
+    return pixmap;
+}
+
 void
 xwl_seat_set_cursor(struct xwl_seat *xwl_seat)
 {
     struct xwl_cursor *xwl_cursor = &xwl_seat->cursor;
     PixmapPtr pixmap;
-    CursorPtr cursor;
-    int stride;
 
     if (!xwl_seat->wl_pointer)
         return;
@@ -159,17 +178,9 @@ xwl_seat_set_cursor(struct xwl_seat *xwl_seat)
         return;
     }
 
-    cursor = xwl_seat->x_cursor;
-    pixmap = dixGetPrivate(&cursor->devPrivates, &xwl_cursor_private_key);
+    pixmap = xwl_cursor_get_pixmap(xwl_seat);
     if (!pixmap)
         return;
-
-    stride = cursor->bits->width * 4;
-    if (cursor->bits->argb)
-        memcpy(pixmap->devPrivate.ptr,
-               cursor->bits->argb, cursor->bits->height * stride);
-    else
-        expand_source_and_mask(cursor, pixmap->devPrivate.ptr);
 
     wl_pointer_set_cursor(xwl_seat->wl_pointer,
                           xwl_seat->pointer_enter_serial,
@@ -194,8 +205,6 @@ xwl_tablet_tool_set_cursor(struct xwl_tablet_tool *xwl_tablet_tool)
     struct xwl_seat *xwl_seat = xwl_tablet_tool->seat;
     struct xwl_cursor *xwl_cursor = &xwl_tablet_tool->cursor;
     PixmapPtr pixmap;
-    CursorPtr cursor;
-    int stride;
 
     if (!xwl_seat->x_cursor) {
         zwp_tablet_tool_v2_set_cursor(xwl_tablet_tool->tool,
@@ -211,17 +220,9 @@ xwl_tablet_tool_set_cursor(struct xwl_tablet_tool *xwl_tablet_tool)
         return;
     }
 
-    cursor = xwl_seat->x_cursor;
-    pixmap = dixGetPrivate(&cursor->devPrivates, &xwl_cursor_private_key);
+    pixmap = xwl_cursor_get_pixmap(xwl_seat);
     if (!pixmap)
         return;
-
-    stride = cursor->bits->width * 4;
-    if (cursor->bits->argb)
-        memcpy(pixmap->devPrivate.ptr,
-               cursor->bits->argb, cursor->bits->height * stride);
-    else
-        expand_source_and_mask(cursor, pixmap->devPrivate.ptr);
 
     zwp_tablet_tool_v2_set_cursor(xwl_tablet_tool->tool,
                                   xwl_tablet_tool->proximity_in_serial,
