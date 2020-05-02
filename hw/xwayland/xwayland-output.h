@@ -53,7 +53,7 @@ struct xwl_output {
     struct wl_output *output;
     struct zxdg_output_v1 *xdg_output;
     uint32_t server_output_id;
-    int32_t x, y, width, height, refresh;
+    int32_t x, y, width, height, scale, refresh;
     Rotation rotation;
     Bool wl_output_done;
     Bool xdg_output_done;
@@ -99,6 +99,8 @@ void xwl_output_set_emulated_mode(struct xwl_output *xwl_output,
                                   Bool from_vidmode);
 void xwl_output_set_window_randr_emu_props(struct xwl_screen *xwl_screen,
                                            WindowPtr window);
+
+void xwl_output_apply_changes(struct xwl_output *xwl_output);
 
 void xwl_screen_init_xdg_output(struct xwl_screen *xwl_screen);
 

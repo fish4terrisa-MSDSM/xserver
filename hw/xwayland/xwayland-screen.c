@@ -110,6 +110,12 @@ xwl_screen_has_resolution_change_emulation(struct xwl_screen *xwl_screen)
     return xwl_screen->rootless && xwl_screen_has_viewport_support(xwl_screen);
 }
 
+int
+xwl_scale_to(struct xwl_screen *xwl_screen, int value)
+{
+    return value / (double)xwl_screen->global_output_scale + 0.5;
+}
+
 /* Return the output @ 0x0, falling back to the first output in the list */
 struct xwl_output *
 xwl_screen_get_first_output(struct xwl_screen *xwl_screen)
@@ -631,8 +637,14 @@ void xwl_surface_damage(struct xwl_screen *xwl_screen,
 {
     if (wl_surface_get_version(surface) >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
         wl_surface_damage_buffer(surface, x, y, width, height);
-    else
+    else {
+        x = xwl_scale_to(xwl_screen, x);
+        y = xwl_scale_to(xwl_screen, y);
+        width = xwl_scale_to(xwl_screen, width);
+        height = xwl_scale_to(xwl_screen, height);
+
         wl_surface_damage(surface, x, y, width, height);
+    }
 }
 
 void
@@ -701,6 +713,18 @@ xwl_screen_get_next_output_serial(struct xwl_screen *xwl_screen)
     return xwl_screen->output_name_serial++;
 }
 
+void
+xwl_screen_set_global_scale(struct xwl_screen *xwl_screen, int32_t scale)
+{
+    struct xwl_output *it;
+    xwl_screen->global_output_scale = scale;
+
+    /* change randr resolutions and positions */
+    xorg_list_for_each_entry(it, &xwl_screen->output_list, link) {
+        xwl_output_apply_changes(it);
+    }
+}
+
 Bool
 xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
 {
@@ -739,6 +763,7 @@ xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
 #ifdef XWL_HAS_GLAMOR
     xwl_screen->glamor = 1;
 #endif
+    xwl_screen->global_output_scale = 1;
 
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-rootless") == 0) {

@@ -187,6 +187,9 @@ update_screen_size(struct xwl_screen *xwl_screen, int width, int height)
     xwl_screen->width = width;
     xwl_screen->height = height;
 
+    width *= xwl_screen->global_output_scale;
+    height *= xwl_screen->global_output_scale;
+
     if (xwl_screen->root_clip_mode == ROOT_CLIP_FULL)
         SetRootClip(xwl_screen->screen, ROOT_CLIP_NONE);
 
@@ -594,14 +597,15 @@ xwl_output_set_emulated_mode(struct xwl_output *xwl_output, ClientPtr client,
                                              new_emulated_height);
 }
 
-static void
-apply_output_change(struct xwl_output *xwl_output)
+void
+xwl_output_apply_changes(struct xwl_output *xwl_output)
 {
     struct xwl_screen *xwl_screen = xwl_output->xwl_screen;
     struct xwl_output *it;
     int mode_width, mode_height, count;
     int width = 0, height = 0, has_this_output = 0;
     RRModePtr *randr_modes;
+    int32_t scale = xwl_screen->global_output_scale;
 
     /* Clear out the "done" received flags */
     xwl_output->wl_output_done = FALSE;
@@ -620,10 +624,10 @@ apply_output_change(struct xwl_output *xwl_output)
     }
     if (xwl_output->randr_output) {
         /* Build a fresh modes array using the current refresh rate */
-        randr_modes = output_get_rr_modes(xwl_output, mode_width, mode_height, &count);
+        randr_modes = output_get_rr_modes(xwl_output, mode_width * scale, mode_height * scale, &count);
         RROutputSetModes(xwl_output->randr_output, randr_modes, count, 1);
         RRCrtcNotify(xwl_output->randr_crtc, randr_modes[0],
-                     xwl_output->x, xwl_output->y,
+                     xwl_output->x * scale, xwl_output->y * scale,
                      xwl_output->rotation, NULL, 1, &xwl_output->randr_output);
         /* RROutputSetModes takes ownership of the passed in modes, so we only
          * have to free the pointer array.
@@ -666,7 +670,7 @@ output_handle_done(void *data, struct wl_output *wl_output)
      */
     if (xwl_output->xdg_output_done || !xwl_output->xdg_output ||
         zxdg_output_v1_get_version(xwl_output->xdg_output) >= 3)
-        apply_output_change(xwl_output);
+        xwl_output_apply_changes(xwl_output);
 }
 
 static void
@@ -709,7 +713,7 @@ xdg_output_handle_done(void *data, struct zxdg_output_v1 *xdg_output)
     xwl_output->xdg_output_done = TRUE;
     if (xwl_output->wl_output_done &&
         zxdg_output_v1_get_version(xdg_output) < 3)
-        apply_output_change(xwl_output);
+        xwl_output_apply_changes(xwl_output);
 }
 
 static void
@@ -814,6 +818,8 @@ xwl_output_create(struct xwl_screen *xwl_screen, uint32_t id, Bool with_xrandr)
         RROutputSetCrtcs(xwl_output->randr_output, &xwl_output->randr_crtc, 1);
         RROutputSetConnection(xwl_output->randr_output, RR_Connected);
         RRTellChanged(xwl_screen->screen);
+
+        xwl_output->scale = 1;
     }
     /* We want the output to be in the list as soon as created so we can
      * use it when binding to the xdg-output protocol...
