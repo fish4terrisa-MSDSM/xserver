@@ -502,6 +502,13 @@ xwl_screen_roundtrip(struct xwl_screen *xwl_screen)
         xwl_give_up("could not connect to wayland server\n");
 }
 
+void
+xwl_screen_set_global_scale( struct xwl_screen *xwl_screen, int32_t scale)
+{
+    struct xwl_output *it;
+    xwl_screen->global_output_scale = scale;
+}
+
 Bool
 xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
 {
@@ -537,6 +544,7 @@ xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
 #ifdef XWL_HAS_GLAMOR
     xwl_screen->glamor = 1;
 #endif
+    xwl_screen->global_output_scale = 1;
 
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-rootless") == 0) {

@@ -41,11 +41,14 @@
 
 #include "xwayland-screen.h"
 #include "xwayland-vidmode.h"
+#include "xwayland-ext.h"
 
 #ifdef XF86VIDMODE
 #include <X11/extensions/xf86vmproto.h>
 extern _X_EXPORT Bool noXFree86VidModeExtension;
 #endif
+
+_X_EXPORT Bool noXwaylandExtension;
 
 void
 ddxGiveUp(enum ExitCode error)
@@ -221,6 +224,7 @@ xwl_log_handler(const char *format, va_list args)
 static const ExtensionModule xwayland_extensions[] = {
 #ifdef XF86VIDMODE
     { xwlVidModeExtensionInit, XF86VIDMODENAME, &noXFree86VidModeExtension },
+    { xwlExtensionInit, XWAYLANDNAME, &noXwaylandExtension },
 #endif
 };
 

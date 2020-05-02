@@ -72,6 +72,8 @@ struct xwl_screen {
     struct xorg_list damage_window_list;
     struct xorg_list window_list;
 
+    int32_t global_output_scale;
+
     int wayland_fd;
     struct wl_display *display;
     struct wl_registry *registry;
@@ -130,5 +132,6 @@ void xwl_screen_roundtrip (struct xwl_screen *xwl_screen);
 void xwl_surface_damage(struct xwl_screen *xwl_screen,
                         struct wl_surface *surface,
                         int32_t x, int32_t y, int32_t width, int32_t height);
+void xwl_screen_set_global_scale( struct xwl_screen *xwl_screen, int32_t scale);
 
 #endif /* XWAYLAND_SCREEN_H */
