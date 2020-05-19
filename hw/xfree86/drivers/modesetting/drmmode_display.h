@@ -294,4 +294,7 @@ int drmmode_crtc_flip(xf86CrtcPtr crtc, uint32_t fb_id, uint32_t flags, void *da
 
 void drmmode_set_dpms(ScrnInfoPtr scrn, int PowerManagementMode, int flags);
 
+Bool headless_output_init(ScrnInfoPtr pScrn);
+Bool headless_crtc_init(ScrnInfoPtr pScrn);
+
 #endif

@@ -131,6 +131,7 @@ static const OptionInfoRec Options[] = {
     {OPTION_ZAPHOD_HEADS, "ZaphodHeads", OPTV_STRING, {0}, FALSE},
     {OPTION_DOUBLE_SHADOW, "DoubleShadow", OPTV_BOOLEAN, {0}, FALSE},
     {OPTION_ATOMIC, "Atomic", OPTV_BOOLEAN, {0}, FALSE},
+    {OPTION_HEADLESS, "Headless", OPTV_BOOLEAN, {0}, FALSE},
     {-1, NULL, OPTV_NONE, {0}, FALSE}
 };
 
@@ -232,15 +233,17 @@ static int
 check_outputs(int fd, int *count)
 {
     drmModeResPtr res = drmModeGetResources(fd);
-    int ret;
+    int ret = FALSE;
 
     if (!res)
-        return FALSE;
+        goto no_res;
 
     if (count)
         *count = res->count_connectors;
 
     ret = res->count_connectors > 0;
+    drmModeFreeResources(res);
+no_res:
 #if defined(GLAMOR_HAS_GBM_LINEAR)
     if (ret == FALSE) {
         uint64_t value = 0;
@@ -249,7 +252,6 @@ check_outputs(int fd, int *count)
             ret = TRUE;
     }
 #endif
-    drmModeFreeResources(res);
     return ret;
 }
 

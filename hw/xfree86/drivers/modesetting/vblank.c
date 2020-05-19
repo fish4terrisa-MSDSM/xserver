@@ -107,7 +107,13 @@ static int ms_box_area(BoxPtr box)
 Bool
 ms_crtc_on(xf86CrtcPtr crtc)
 {
+    ScreenPtr screen = crtc->randr_crtc->pScreen;
+    ScrnInfoPtr scrn = xf86ScreenToScrn(screen);
+    modesettingPtr ms = modesettingPTR(scrn);
     drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
+
+    if (ms->headless)
+        return TRUE;
 
     return crtc->enabled && drmmode_crtc->dpms_mode == DPMSModeOn;
 }
@@ -469,6 +475,9 @@ ms_get_crtc_ust_msc(xf86CrtcPtr crtc, CARD64 *ust, CARD64 *msc)
     ScrnInfoPtr scrn = xf86ScreenToScrn(screen);
     modesettingPtr ms = modesettingPTR(scrn);
     uint64_t kernel_msc;
+
+    if (ms->headless)
+        return Success;
 
     if (!ms_get_kernel_ust_msc(crtc, &kernel_msc, ust))
         return BadMatch;

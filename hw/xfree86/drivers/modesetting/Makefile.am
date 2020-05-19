@@ -50,6 +50,7 @@ modesetting_drv_la_SOURCES = \
 	 driver.h \
 	 drmmode_display.c \
 	 drmmode_display.h \
+	 headless_display.c \
 	 dumb_bo.c \
 	 dumb_bo.h \
 	 present.c \

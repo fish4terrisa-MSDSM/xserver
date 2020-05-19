@@ -89,7 +89,11 @@ Bool
 drmmode_is_format_supported(ScrnInfoPtr scrn, uint32_t format, uint64_t modifier)
 {
     xf86CrtcConfigPtr xf86_config = XF86_CRTC_CONFIG_PTR(scrn);
+    modesettingPtr ms = modesettingPTR(scrn);
     int c, i, j;
+
+    if (ms->headless)
+        return TRUE;
 
     /* BO are imported as opaque surface, so let's pretend there is no alpha */
     format = get_opaque_format(format);
@@ -144,6 +148,9 @@ get_modifiers_set(ScrnInfoPtr scrn, uint32_t format, uint64_t **modifiers,
     drmmode_ptr drmmode = &ms->drmmode;
     int c, i, j, k, count_modifiers = 0;
     uint64_t *tmp, *ret = NULL;
+
+    if (ms->headless)
+        return 0;
 
     /* BOs are imported as opaque surfaces, so pretend the same thing here */
     format = get_opaque_format(format);
@@ -3397,12 +3404,30 @@ Bool
 drmmode_pre_init(ScrnInfoPtr pScrn, drmmode_ptr drmmode, int cpp)
 {
     modesettingEntPtr ms_ent = ms_ent_priv(pScrn);
+    modesettingPtr ms = modesettingPTR(pScrn);
     int i;
     int ret;
     uint64_t value = 0;
     unsigned int crtcs_needed = 0;
     drmModeResPtr mode_res;
     int crtcshift;
+    Bool headless;
+
+    if (xf86GetOptValBool(ms->drmmode.Options, OPTION_HEADLESS, &headless))
+        ms->headless = headless;
+
+    drmmode->scrn = pScrn;
+    drmmode->cpp = cpp;
+    mode_res = drmModeGetResources(drmmode->fd);
+    if (!mode_res && ms->headless) {
+	if (!headless_output_init(pScrn))
+	    return FALSE;
+
+	if (!headless_crtc_init(pScrn))
+	    return FALSE;
+
+        goto out;
+    }
 
     /* check for dumb capability */
     ret = drmGetCap(drmmode->fd, DRM_CAP_DUMB_BUFFER, &value);
@@ -3413,13 +3438,6 @@ drmmode_pre_init(ScrnInfoPtr pScrn, drmmode_ptr drmmode, int cpp)
     }
 
     xf86CrtcConfigInit(pScrn, &drmmode_xf86crtc_config_funcs);
-
-    drmmode->scrn = pScrn;
-    drmmode->cpp = cpp;
-    mode_res = drmModeGetResources(drmmode->fd);
-    if (!mode_res)
-        return FALSE;
-
     crtcshift = ffs(ms_ent->assigned_crtcs ^ 0xffffffff) - 1;
     for (i = 0; i < mode_res->count_connectors; i++)
         crtcs_needed += drmmode_output_init(pScrn, drmmode, mode_res, i, FALSE,
@@ -3445,6 +3463,8 @@ drmmode_pre_init(ScrnInfoPtr pScrn, drmmode_ptr drmmode, int cpp)
     drmmode_clones_init(pScrn, drmmode, mode_res);
 
     drmModeFreeResources(mode_res);
+
+out:
     xf86ProviderSetup(pScrn, NULL, "modesetting");
 
     xf86InitialConfiguration(pScrn, TRUE);
@@ -3488,7 +3508,11 @@ Bool
 drmmode_set_desired_modes(ScrnInfoPtr pScrn, drmmode_ptr drmmode, Bool set_hw)
 {
     xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(pScrn);
+    modesettingPtr ms = modesettingPTR(pScrn);
     int c;
+
+    if (ms->headless)
+        return TRUE;
 
     for (c = 0; c < config->num_crtc; c++) {
         xf86CrtcPtr crtc = config->crtc[c];
@@ -3558,6 +3582,7 @@ drmmode_load_palette(ScrnInfoPtr pScrn, int numColors,
                      int *indices, LOCO * colors, VisualPtr pVisual)
 {
     xf86CrtcConfigPtr xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
+    modesettingPtr ms = modesettingPTR(pScrn);
     uint16_t lut_r[256], lut_g[256], lut_b[256];
     int index, j, i;
     int c;
@@ -3566,11 +3591,13 @@ drmmode_load_palette(ScrnInfoPtr pScrn, int numColors,
         xf86CrtcPtr crtc = xf86_config->crtc[c];
         drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
 
-        for (i = 0; i < 256; i++) {
-            lut_r[i] = drmmode_crtc->lut_r[i] << 6;
-            lut_g[i] = drmmode_crtc->lut_g[i] << 6;
-            lut_b[i] = drmmode_crtc->lut_b[i] << 6;
-        }
+	if (!ms->headless) {
+            for (i = 0; i < 256; i++) {
+                lut_r[i] = drmmode_crtc->lut_r[i] << 6;
+                lut_g[i] = drmmode_crtc->lut_g[i] << 6;
+                lut_b[i] = drmmode_crtc->lut_b[i] << 6;
+            }
+	}
 
         switch (pScrn->depth) {
         case 15:
@@ -3849,8 +3876,10 @@ drmmode_create_initial_bos(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
         xf86CrtcPtr crtc = xf86_config->crtc[i];
         drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
 
-        drmmode_crtc->cursor_bo =
-            dumb_bo_create(drmmode->fd, width, height, bpp);
+	if (!ms->headless) {
+            drmmode_crtc->cursor_bo =
+                dumb_bo_create(drmmode->fd, width, height, bpp);
+	}
     }
     return TRUE;
 }
@@ -3880,7 +3909,11 @@ Bool
 drmmode_map_cursor_bos(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
 {
     xf86CrtcConfigPtr xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
+    modesettingPtr ms = modesettingPTR(pScrn);
     int i, ret;
+
+    if (ms->headless)
+        return TRUE;
 
     for (i = 0; i < xf86_config->num_crtc; i++) {
         xf86CrtcPtr crtc = xf86_config->crtc[i];
@@ -3897,6 +3930,7 @@ void
 drmmode_free_bos(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
 {
     xf86CrtcConfigPtr xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
+    modesettingPtr ms = modesettingPTR(pScrn);
     int i;
 
     if (drmmode->fb_id) {
@@ -3910,7 +3944,8 @@ drmmode_free_bos(ScrnInfoPtr pScrn, drmmode_ptr drmmode)
         xf86CrtcPtr crtc = xf86_config->crtc[i];
         drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
 
-        dumb_bo_destroy(drmmode->fd, drmmode_crtc->cursor_bo);
+	if (!ms->headless)
+            dumb_bo_destroy(drmmode->fd, drmmode_crtc->cursor_bo);
     }
 }
 

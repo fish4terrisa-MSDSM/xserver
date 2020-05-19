@@ -428,5 +428,8 @@ ms_present_screen_init(ScreenPtr screen)
     if (ret == 0 && value == 1)
         ms_present_screen_info.capabilities |= PresentCapabilityAsync;
 
-    return present_screen_init(screen, &ms_present_screen_info);
+    if (!ms->headless)
+        return present_screen_init(screen, &ms_present_screen_info);
+    else
+        return present_screen_init(screen, NULL);
 }

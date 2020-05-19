@@ -52,6 +52,7 @@ typedef enum {
     OPTION_ZAPHOD_HEADS,
     OPTION_DOUBLE_SHADOW,
     OPTION_ATOMIC,
+    OPTION_HEADLESS,
 } modesettingOpts;
 
 typedef struct
@@ -121,6 +122,7 @@ typedef struct _modesettingRec {
     Bool tried_queue_sequence;
 
     Bool kms_has_modifiers;
+    Bool headless;
 
     /* shadow API */
     struct {
