@@ -121,21 +121,21 @@ message_filter(DBusConnection * connection, DBusMessage * message, void *data)
 }
 
 /**
- * Attempt to connect to the system bus, and set a filter to deal with
+ * Attempt to connect to the designated bus, and set a filter to deal with
  * disconnection (see message_filter above).
  *
  * @return 1 on success, 0 on failure.
  */
 static int
-connect_to_bus(void)
+connect_to_bus(DBusBusType bus)
 {
     DBusError error;
     struct dbus_core_hook *hook;
 
     dbus_error_init(&error);
-    bus_info.connection = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
+    bus_info.connection = dbus_bus_get(bus, &error);
     if (!bus_info.connection || dbus_error_is_set(&error)) {
-        LogMessage(X_ERROR, "dbus-core: error connecting to system bus: %s (%s)\n",
+        LogMessage(X_ERROR, "dbus-core: error connecting to the bus: %s (%s)\n",
                error.name, error.message);
         goto err_begin;
     }
@@ -144,7 +144,7 @@ connect_to_bus(void)
     dbus_connection_set_exit_on_disconnect(bus_info.connection, FALSE);
 
     if (!dbus_connection_get_unix_fd(bus_info.connection, &bus_info.fd)) {
-        ErrorF("[dbus-core] couldn't get fd for system bus\n");
+        ErrorF("[dbus-core] couldn't get fd for the bus\n");
         goto err_unref;
     }
 
@@ -179,7 +179,8 @@ connect_to_bus(void)
 static CARD32
 reconnect_timer(OsTimerPtr timer, CARD32 time, void *arg)
 {
-    if (connect_to_bus()) {
+    DBusBusType bus = (DBusBusType) arg;
+    if (connect_to_bus(bus)) {
         TimerFree(bus_info.timer);
         bus_info.timer = NULL;
         return 0;
@@ -220,13 +221,13 @@ dbus_core_remove_hook(struct dbus_core_hook *hook)
 }
 
 int
-dbus_core_init(void)
+dbus_core_init(DBusBusType bus)
 {
     memset(&bus_info, 0, sizeof(bus_info));
     bus_info.fd = -1;
     bus_info.hooks = NULL;
-    if (!connect_to_bus())
-        bus_info.timer = TimerSet(NULL, 0, 1, reconnect_timer, NULL);
+    if (!connect_to_bus(bus))
+        bus_info.timer = TimerSet(NULL, 0, 1, reconnect_timer, (void *) bus);
 
     return 1;
 }

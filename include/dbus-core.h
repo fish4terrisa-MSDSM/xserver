@@ -41,7 +41,7 @@ struct dbus_core_hook {
     struct dbus_core_hook *next;
 };
 
-int dbus_core_init(void);
+int dbus_core_init(DBusBusType bus);
 void dbus_core_fini(void);
 int dbus_core_add_hook(struct dbus_core_hook *hook);
 void dbus_core_remove_hook(struct dbus_core_hook *hook);

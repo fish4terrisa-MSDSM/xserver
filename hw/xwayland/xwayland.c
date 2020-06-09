@@ -236,7 +236,7 @@ InitOutput(ScreenInfo * screen_info, int argc, char **argv)
     int i;
 
 #ifdef XWL_HAS_XDG_PORTAL
-    dbus_core_init();
+    dbus_core_init(DBUS_BUS_SESSION);
 #endif /* XWL_HAS_XDG_PORTAL */
 
     for (i = 0; i < ARRAY_SIZE(depths); i++) {

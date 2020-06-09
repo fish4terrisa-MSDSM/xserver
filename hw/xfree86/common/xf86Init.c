@@ -333,7 +333,7 @@ InitOutput(ScreenInfo * pScreenInfo, int argc, char **argv)
         if (xf86DoShowOptions)
             DoShowOptions();
 
-        dbus_core_init();
+        dbus_core_init(DBUS_BUS_SYSTEM);
         systemd_logind_init();
 
         /* Do a general bus probe.  This will be a PCI probe for x86 platforms */
