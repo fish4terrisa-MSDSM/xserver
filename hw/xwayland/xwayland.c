@@ -38,6 +38,7 @@
 #include <xserver_poll.h>
 #include <propertyst.h>
 #include <version-config.h>
+#include "dbus-core.h"
 
 #include "xwayland-screen.h"
 #include "xwayland-vidmode.h"
@@ -50,6 +51,9 @@ extern _X_EXPORT Bool noXFree86VidModeExtension;
 void
 ddxGiveUp(enum ExitCode error)
 {
+#ifdef XWL_HAS_XDG_PORTAL
+    dbus_core_fini();
+#endif /* XWL_HAS_XDG_PORTAL */
 }
 
 void
@@ -230,6 +234,10 @@ InitOutput(ScreenInfo * screen_info, int argc, char **argv)
     int depths[] = { 1, 4, 8, 15, 16, 24, 32 };
     int bpp[] =    { 1, 8, 8, 16, 16, 32, 32 };
     int i;
+
+#ifdef XWL_HAS_XDG_PORTAL
+    dbus_core_init();
+#endif /* XWL_HAS_XDG_PORTAL */
 
     for (i = 0; i < ARRAY_SIZE(depths); i++) {
         screen_info->formats[i].depth = depths[i];

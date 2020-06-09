@@ -9,3 +9,6 @@
 
 /* Build eglstream support for Xwayland */
 #mesondefine XWL_HAS_EGLSTREAM
+
+/* Enable XDG portal integration */
+#mesondefine XWL_HAS_XDG_PORTAL

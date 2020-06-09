@@ -10,4 +10,10 @@
 /* Build eglstream support for Xwayland */
 #undef XWL_HAS_EGLSTREAM
 
+/* Build eglstream support for Xwayland */
+#undef XWL_HAS_EGLSTREAM
+
+/* Enable XDG portal integration */
+#undef XWL_HAS_XDG_PORTAL
+
 #endif /* _XWAYLAND_CONFIG_H_ */

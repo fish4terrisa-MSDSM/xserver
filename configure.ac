@@ -582,6 +582,7 @@ AC_ARG_ENABLE(xwayland,       AS_HELP_STRING([--enable-xwayland], [Build Xwaylan
 AC_ARG_ENABLE(xwayland-eglstream, AS_HELP_STRING([--enable-xwayland-eglstream], [Build Xwayland eglstream support (default: no)]), [XWAYLAND_EGLSTREAM=$enableval], [XWAYLAND_EGLSTREAM=no])
 AC_ARG_WITH(xwayland-path, AS_HELP_STRING([--with-xwayland-path=PATH], [Directory containing Xwayland executable (default: ${bindir})]),
 					 [ xwayland_path="$withval" ], [ xwayland_path="$bindir" ])
+AC_ARG_ENABLE(xwayland-xdg-portal, AS_HELP_STRING([--enable-xwayland-xdg-portal], [Build Xwayland XDG portal support (default: auto)]), [XWAYLAND_XDG_PORTAL=$enableval], [XWAYLAND_XDG_PORTAL=auto])
 AC_ARG_ENABLE(standalone-xpbproxy, AS_HELP_STRING([--enable-standalone-xpbproxy], [Build a standalone xpbproxy (in addition to the one integrated into Xquartz as a separate thread) (default: no)]), [STANDALONE_XPBPROXY=$enableval], [STANDALONE_XPBPROXY=no])
 AC_ARG_ENABLE(xwin,    	      AS_HELP_STRING([--enable-xwin], [Build XWin server (default: auto)]), [XWIN=$enableval], [XWIN=auto])
 AC_ARG_ENABLE(glamor,         AS_HELP_STRING([--enable-glamor], [Build glamor dix module (default: auto)]), [GLAMOR=$enableval], [GLAMOR=auto])
@@ -2369,9 +2370,24 @@ if test "x$XWAYLAND" = xyes; then
 
 	AC_SUBST(xwayland_path)
 
+	if test "x$XWAYLAND_XDG_PORTAL" = "xauto"; then
+		if test "x$HAVE_DBUS" = "xyes"; then
+			XWAYLAND_XDG_PORTAL="yes"
+		else
+			XWAYLAND_XDG_PORTAL="no"
+		fi
+	fi
+	if test "x$XWAYLAND_XDG_PORTAL" = "xyes"; then
+		if ! test "x$HAVE_DBUS" = "xyes"; then
+			AC_MSG_ERROR([XDG portal support requested, but D-Bus is not installed.])
+		fi
+
+		AC_DEFINE(XWL_HAS_XDG_PORTAL, 1, [Enable XDG portal integration])
+		NEED_DBUS="yes"
+	fi
 fi
 AM_CONDITIONAL(XWAYLAND_EGLSTREAM, [test "x$XWAYLAND_EGLSTREAM" = "xyes"])
-
+AM_CONDITIONAL(XWAYLAND_XDG_PORTAL, [test "x$XWAYLAND_XDG_PORTAL" = "xyes"])
 
 dnl and the rest of these are generic, so they're in config.h
 dnl 

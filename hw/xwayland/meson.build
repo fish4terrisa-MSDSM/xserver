@@ -27,6 +27,7 @@ srcs = [
     '../../mi/miinitext.c',
 ]
 
+
 scanner_dep = dependency('wayland-scanner', native: true)
 scanner = find_program(scanner_dep.get_pkgconfig_variable('wayland_scanner'))
 
@@ -112,12 +113,17 @@ if build_glx
     wayland_inc += glx_inc
 endif
 
+if build_xdg_portal
+    srcs += '../../config/dbus-core.c'
+endif
+
 executable(
     'Xwayland',
     srcs,
     include_directories: wayland_inc,
     dependencies: [
         common_dep,
+        dbus_dep,
         xwayland_dep,
     ],
     link_with: [

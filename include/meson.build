@@ -403,6 +403,7 @@ configure_file(output : 'xwin-config.h',
 xwayland_data = configuration_data()
 xwayland_data.set('XWL_HAS_GLAMOR', build_glamor and (gbm_dep.found() or build_eglstream))
 xwayland_data.set('XWL_HAS_EGLSTREAM', build_eglstream)
+xwayland_data.set('XWL_HAS_XDG_PORTAL', build_xdg_portal)
 
 configure_file(output : 'xwayland-config.h',
                input : 'xwayland-config.h.meson.in',

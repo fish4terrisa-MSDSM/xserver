@@ -307,8 +307,6 @@ if build_udev and build_hal
     error('Hotplugging through both libudev and hal not allowed')
 endif
 
-build_dbus = build_hal or build_systemd_logind
-
 udev_dep = dependency('', required:false)
 if build_udev or build_udev_kms
     udev_dep = dependency('libudev', version: '>= 143')
@@ -348,6 +346,21 @@ if build_xwayland and build_glamor
 else
     build_eglstream = false
 endif
+
+xdg_portal_option = get_option('xwayland_xdg_portal')
+if build_xwayland
+    if xdg_portal_option == 'auto'
+        build_xdg_portal = dbus_dep.found()
+    else
+        if xdg_portal_option and not dbus_dep.found()
+            error('XDG portal support requested, but DBus not found')
+        endif
+    endif
+else
+    build_xdg_portal = false
+endif
+
+build_dbus = build_xdg_portal or build_hal or build_systemd_logind
 
 # Lots of sha1 options, because Linux is about choice :)
 
