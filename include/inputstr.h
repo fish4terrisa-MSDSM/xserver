@@ -600,6 +600,7 @@ typedef struct _DeviceIntRec {
 
     /* XTest related master device id */
     int xtest_master_id;
+    DeviceSendEventsProc sendEventsProc;
 
     struct _SyncCounter *idle_counter;
 } DeviceIntRec;
