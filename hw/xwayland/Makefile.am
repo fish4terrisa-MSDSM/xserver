@@ -61,7 +61,10 @@ Xwayland_LDFLAGS = $(LD_EXPORT_SYMBOLS_FLAG)
 Xwayland_built_sources =
 
 if XWAYLAND_XDG_PORTAL
-Xwayland_SOURCES += $(top_srcdir)/config/dbus-core.c
+Xwayland_SOURCES += \
+	xwayland-xdg-portal.c \
+	xwayland-xdg-portal.h \
+	$(top_srcdir)/config/dbus-core.c
 Xwayland_CFLAGS += $(DBUS_CFLAGS)
 Xwayland_LDADD += $(DBUS_LIBS)
 endif # XWAYLAND_XDG_PORTAL

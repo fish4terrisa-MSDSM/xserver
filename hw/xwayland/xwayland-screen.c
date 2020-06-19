@@ -51,6 +51,9 @@
 #include "xwayland-pixmap.h"
 #include "xwayland-present.h"
 #include "xwayland-shm.h"
+#ifdef XWL_HAS_XDG_PORTAL
+#include "xwayland-xdg-portal.h"
+#endif /* XWL_HAS_XDG_PORTAL */
 
 #include "xdg-output-unstable-v1-client-protocol.h"
 #include "viewporter-client-protocol.h"
@@ -167,6 +170,10 @@ xwl_close_screen(ScreenPtr screen)
     RemoveNotifyFd(xwl_screen->wayland_fd);
 
     wl_display_disconnect(xwl_screen->display);
+
+#ifdef XWL_HAS_XDG_PORTAL
+    xdg_portal_fini();
+#endif /* XWL_HAS_XDG_PORTAL */
 
     screen->CloseScreen = xwl_screen->CloseScreen;
     free(xwl_screen);
@@ -722,6 +729,10 @@ xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
     AddCallback(&PropertyStateCallback, xwl_property_callback, pScreen);
 
     xwl_screen_roundtrip(xwl_screen);
+
+#ifdef XWL_HAS_XDG_PORTAL
+    xdg_portal_init();
+#endif /* XWL_HAS_XDG_PORTAL */
 
     return ret;
 }
