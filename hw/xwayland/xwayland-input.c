@@ -43,6 +43,9 @@
 #include "xwayland-input.h"
 #include "xwayland-window.h"
 #include "xwayland-screen.h"
+#ifdef XWL_HAS_XDG_PORTAL
+#include "xwayland-xdg-portal.h"
+#endif /* XWL_HAS_XDG_PORTAL */
 
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
@@ -1177,6 +1180,84 @@ setup_keyboard_grab_handler (DeviceIntPtr device)
     device->deviceGrab.DeactivateGrab = xwl_keyboard_deactivate_grab;
 }
 
+#ifdef XWL_HAS_XDG_PORTAL
+static Bool
+xwl_virtual_input_absolute_to_relative(DeviceIntPtr device, int *dx, int *dy)
+{
+    struct xwl_seat *xwl_seat = device->public.devicePrivate;
+    int rootx, rooty;
+
+    if (xwl_seat == NULL)
+        xwl_seat = find_matching_seat(device, MASTER_POINTER);
+
+    /* Absolute pointer motion on non Wayland native windows is not supported */
+    if (xwl_seat == NULL || xwl_seat->focus_window == NULL)
+        return FALSE;
+
+    /* Translate absolute into relative motion */
+    miPointerGetPosition(xwl_seat->pointer, &rootx, &rooty);
+    *dx -= rootx;
+    *dy -= rooty;
+
+    return TRUE;
+}
+
+static void
+xwl_virtual_input_event(DeviceIntPtr device,
+                        int type,
+                        int detail,
+                        int flags,
+                        int firstValuator,
+                        int numValuators,
+                        const int *valuators)
+{
+    int dx, dy;
+
+    switch (type) {
+    case MotionNotify:
+        if (firstValuator != 0 || numValuators != 2) {
+            ErrorF("Motion incomplete\n");
+            return;
+        }
+
+        dx = valuators[0];
+        dy = valuators[1];
+
+        if (flags & POINTER_ABSOLUTE) {
+            if (!xwl_virtual_input_absolute_to_relative(device, &dx, &dy)) {
+                LogMessage(X_INFO, "Failed to transform absolute coordinates to relative\n");
+                return;
+            }
+        }
+        portal_remotedesktop_notify_pointer_motion(dx, dy);
+        break;
+    case ButtonPress:
+    case ButtonRelease:
+        portal_remotedesktop_notify_pointer_button(detail, (type == ButtonPress));
+        break;
+    case KeyPress:
+    case KeyRelease:
+        portal_remotedesktop_notify_keyboard_keycode(detail, (type == KeyPress));
+        break;
+    default:
+        LogMessage(X_INFO, "Unhandled event type %i\n", type);
+    }
+}
+
+static void
+setup_xtest_virual_input_hook(DeviceIntPtr master)
+{
+    DeviceIntPtr xtest_device;
+
+    xtest_device = GetXTestDevice (master);
+
+    if (!xtest_device)
+        return;
+
+    xtest_device->sendEventsProc = xwl_virtual_input_event;
+}
+#endif /* XWL_HAS_XDG_PORTAL */
+
 static DeviceIntPtr
 add_device(struct xwl_seat *xwl_seat,
            const char *driver, DeviceProc device_proc)
@@ -1214,10 +1295,13 @@ enable_device(struct xwl_seat *xwl_seat, DeviceIntPtr dev)
     EnableDevice(dev, TRUE);
 }
 
-
 static void
 init_pointer(struct xwl_seat *xwl_seat)
 {
+#ifdef XWL_HAS_XDG_PORTAL
+    DeviceIntPtr master;
+#endif /* XWL_HAS_XDG_PORTAL */
+
     xwl_seat->wl_pointer = wl_seat_get_pointer(xwl_seat->seat);
     wl_pointer_add_listener(xwl_seat->wl_pointer,
                             &pointer_listener, xwl_seat);
@@ -1229,6 +1313,12 @@ init_pointer(struct xwl_seat *xwl_seat)
         ActivateDevice(xwl_seat->pointer, TRUE);
     }
     enable_device(xwl_seat, xwl_seat->pointer);
+
+#ifdef XWL_HAS_XDG_PORTAL
+    master = GetMaster(xwl_seat->pointer, MASTER_POINTER);
+    if (master)
+        setup_xtest_virual_input_hook(master);
+#endif /* XWL_HAS_XDG_PORTAL */
 }
 
 static void
@@ -1294,10 +1384,13 @@ init_keyboard(struct xwl_seat *xwl_seat)
     enable_device(xwl_seat, xwl_seat->keyboard);
     xwl_seat->keyboard->key->xkbInfo->checkRepeat = keyboard_check_repeat;
 
-    if (xwl_seat->xwl_screen->wp_grab) {
+    master = GetMaster(xwl_seat->keyboard, MASTER_KEYBOARD);
+    if (master) {
+#ifdef XWL_HAS_XDG_PORTAL
+        setup_xtest_virual_input_hook(master);
+#endif /* XWL_HAS_XDG_PORTAL */
         /* We have Xwayland grab protocol supported by the compositor */
-        master = GetMaster(xwl_seat->keyboard, MASTER_KEYBOARD);
-        if (master)
+        if (xwl_seat->xwl_screen->wp_grab)
             setup_keyboard_grab_handler(master);
     }
 }
