@@ -530,7 +530,7 @@ dispatch_pointer_motion_event(struct xwl_seat *xwl_seat)
         }
 
         QueuePointerEvents(xwl_seat->pointer, MotionNotify, 0,
-                           POINTER_ABSOLUTE | POINTER_SCREEN, &mask);
+                           POINTER_ABSOLUTE | POINTER_DESKTOP, &mask);
     }
 
     xwl_seat->pending_pointer_event.has_absolute = FALSE;
