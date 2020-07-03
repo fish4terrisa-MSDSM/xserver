@@ -1078,15 +1078,36 @@ static const struct wl_touch_listener touch_listener = {
     touch_handle_cancel
 };
 
-static struct xwl_seat *
-find_matching_seat(DeviceIntPtr device)
+static Bool
+is_xwl_device(DeviceIntPtr device, int type)
 {
+    switch (type) {
+        case MASTER_KEYBOARD:
+            return device->deviceProc == xwl_keyboard_proc;
+            break;
+        case MASTER_POINTER:
+            return device->deviceProc == xwl_pointer_proc ||
+                   device->deviceProc == xwl_pointer_proc_relative;
+            break;
+        default:
+            break;
+    }
+
+    return FALSE;
+}
+
+static struct xwl_seat *
+find_matching_seat(DeviceIntPtr device, int type)
+{
+    DeviceIntPtr master = GetMaster(device, type);
     DeviceIntPtr dev;
 
+    if (!master)
+        return NULL;
+
     for (dev = inputInfo.devices; dev; dev = dev->next)
-        if (dev->deviceProc == xwl_keyboard_proc &&
-            device == GetMaster(dev, MASTER_KEYBOARD))
-                return (struct xwl_seat *) dev->public.devicePrivate;
+        if (is_xwl_device(dev, type) && (master == GetMaster(dev, type)))
+            return (struct xwl_seat *) dev->public.devicePrivate;
 
     return NULL;
 }
@@ -1127,7 +1148,7 @@ xwl_keyboard_activate_grab(DeviceIntPtr device, GrabPtr grab, TimeStamp time, Bo
     if (!passive) {
         /* If the device is the MASTER_KEYBOARD, we don't have an xwl_seat */
         if (xwl_seat == NULL)
-            xwl_seat = find_matching_seat(device);
+            xwl_seat = find_matching_seat(device, MASTER_KEYBOARD);
         if (xwl_seat)
             set_grab(xwl_seat, xwl_window_from_window(grab->window));
     }
@@ -1142,7 +1163,7 @@ xwl_keyboard_deactivate_grab(DeviceIntPtr device)
 
     /* If the device is the MASTER_KEYBOARD, we don't have an xwl_seat */
     if (xwl_seat == NULL)
-        xwl_seat = find_matching_seat(device);
+        xwl_seat = find_matching_seat(device, MASTER_KEYBOARD);
     if (xwl_seat)
         release_grab (xwl_seat);
 
