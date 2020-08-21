@@ -120,6 +120,7 @@ typedef struct _modesettingRec {
     Bool has_queue_sequence;
     Bool tried_queue_sequence;
 
+    Bool kms_has_universal_planes;
     Bool kms_has_modifiers;
 
     /* shadow API */

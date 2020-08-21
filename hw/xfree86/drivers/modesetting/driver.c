@@ -1079,6 +1079,16 @@ PreInit(ScrnInfoPtr pScrn, int flags)
         ms->atomic_modeset = FALSE;
     }
 
+    /*
+     * Universal planes are implied if atomic modesetting is supported. If
+     * atomic modesetting is not supported, try to at least enable universal
+     * planes so we can make use of framebuffer modifiers.
+     */
+    if (!ms->atomic_modeset) {
+        ret = drmSetClientCap(ms->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+        ms->kms_has_universal_planes = ret == 0;
+    }
+
     ms->kms_has_modifiers = FALSE;
     ret = drmGetCap(ms->fd, DRM_CAP_ADDFB2_MODIFIERS, &value);
     if (ret == 0 && value != 0)
