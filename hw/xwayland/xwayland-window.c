@@ -1200,8 +1200,8 @@ xwl_window_post_damage(struct xwl_window *xwl_window)
     }
 #endif
 
-    wl_surface_set_buffer_scale(xwl_window->surface, xwl_screen->global_output_scale);
     wl_surface_attach(xwl_window->surface, buffer, 0, 0);
+    wl_surface_set_buffer_scale(xwl_window->surface, xwl_screen->global_output_scale);
 
     /* Arbitrary limit to try to avoid flooding the Wayland
      * connection. If we flood it too much anyway, this could

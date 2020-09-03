@@ -710,6 +710,8 @@ xwl_present_flip(WindowPtr present_window,
 
     /* We can flip directly to the main surface (full screen window without clips) */
     wl_surface_attach(xwl_window->surface, buffer, 0, 0);
+     wl_surface_set_buffer_scale(xwl_window->surface,
+                                 xwl_window->xwl_screen->global_output_scale);
 
     if (xorg_list_is_empty(&xwl_present_window->frame_callback_list)) {
         xorg_list_add(&xwl_present_window->frame_callback_list,
