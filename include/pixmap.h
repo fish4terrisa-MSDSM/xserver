@@ -75,6 +75,7 @@ typedef struct _Drawable *DrawablePtr;
 typedef struct _Pixmap *PixmapPtr;
 
 typedef struct _PixmapDirtyUpdate *PixmapDirtyUpdatePtr;
+typedef struct _rrCrtc *RRCrtcPtr;
 
 typedef union _PixUnion {
     PixmapPtr pixmap;
@@ -125,6 +126,13 @@ PixmapStartDirtyTracking(DrawablePtr src,
                          PixmapPtr slave_dst,
                          int x, int y, int dst_x, int dst_y,
                          Rotation rotation);
+
+extern _X_EXPORT Bool
+PixmapStartDirtyTrackingWithCrtc(DrawablePtr src,
+                                 PixmapPtr slave_dst,
+                                 int x, int y, int dst_x, int dst_y,
+                                 RRCrtcPtr ctrc,
+                                 Rotation rotation);
 
 extern _X_EXPORT Bool
 PixmapStopDirtyTracking(DrawablePtr src, PixmapPtr slave_dst);
