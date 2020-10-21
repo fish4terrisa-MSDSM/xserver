@@ -1216,7 +1216,7 @@ PreInit(ScrnInfoPtr pScrn, int flags)
     }
 
     if (xf86ReturnOptValBool(ms->drmmode.Options, OPTION_ATOMIC, FALSE)) {
-        ret = drmSetClientCap(ms->fd, DRM_CLIENT_CAP_ATOMIC, 1);
+        ret = drmSetClientCap(ms->fd, DRM_CLIENT_CAP_ATOMIC, 2);
         ms->atomic_modeset = (ret == 0);
     } else {
         ms->atomic_modeset = FALSE;
