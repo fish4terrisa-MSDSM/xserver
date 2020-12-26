@@ -239,6 +239,10 @@ typedef struct glamor_screen_private {
     glamor_program      copy_area_prog;
     glamor_program      copy_plane_prog;
 
+    /* glamor copy shaders */
+    glamor_program      copy_area_img_ext_prog;
+    glamor_program      copy_plane_img_ext_prog;
+
     /* glamor line shader */
     glamor_program_fill poly_line_program;
 
@@ -330,6 +334,9 @@ typedef struct glamor_pixmap_fbo {
     int width; /**< width in pixels */
     int height; /**< height in pixels */
     Bool is_red;
+#ifdef GLAMOR_HAS_GBM
+    Bool img_ext; /**< whether attached texture is EGLImageKHR backed */
+#endif
 } glamor_pixmap_fbo;
 
 typedef struct glamor_pixmap_clipped_regions {

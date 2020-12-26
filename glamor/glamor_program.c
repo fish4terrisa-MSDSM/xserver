@@ -117,6 +117,12 @@ static glamor_location_var location_vars[] = {
         .location = glamor_program_location_fillsamp,
         .fs_vars = "uniform sampler2D sampler;\n"
     },
+#ifdef GLAMOR_HAS_GBM
+    {
+        .location = glamor_program_location_fillsamp_drm,
+        .fs_vars = "uniform samplerExternalOES sampler;\n"
+    },
+#endif
     {
         .location = glamor_program_location_fillpos,
         .vs_vars = ("uniform vec2 fill_offset;\n"
@@ -199,6 +205,9 @@ static const char vs_template[] =
 
 static const char fs_template[] =
     "%s"                                /* version */
+#ifdef GLAMOR_HAS_GBM
+    "%s"                                /* extensions */
+#endif
     GLAMOR_DEFAULT_PRECISION
     "%s"                                /* defines */
     "%s"                                /* prim fs_vars */
@@ -302,6 +311,9 @@ glamor_build_program(ScreenPtr          screen,
     if (asprintf(&fs_prog_string,
                  fs_template,
                  str(version_string),
+#ifdef GLAMOR_HAS_GBM
+                 str(prim->extensions),
+#endif
                  str(defines),
                  str(prim->fs_vars),
                  str(fill->fs_vars),

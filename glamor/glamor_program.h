@@ -33,6 +33,9 @@ typedef enum {
     glamor_program_location_bitplane = 32,
     glamor_program_location_dash = 64,
     glamor_program_location_atlas = 128,
+#ifdef GLAMOR_HAS_GBM
+    glamor_program_location_fillsamp_drm = 256,
+#endif
 } glamor_program_location;
 
 typedef enum {
@@ -56,6 +59,9 @@ typedef Bool (*glamor_use_render) (CARD8 op, PicturePtr src, PicturePtr dst, gla
 typedef struct {
     const char                          *name;
     const int                           version;
+#ifdef GLAMOR_HAS_GBM
+    const char                          *extensions;
+#endif
     char                                *vs_defines;
     char                                *fs_defines;
     const char                          *vs_vars;

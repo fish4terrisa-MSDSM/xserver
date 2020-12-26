@@ -168,7 +168,12 @@ glamor_bind_texture(glamor_screen_private *glamor_priv, GLenum texture,
                     glamor_pixmap_fbo *fbo, Bool destination_red)
 {
     glActiveTexture(texture);
-    glBindTexture(GL_TEXTURE_2D, fbo->tex);
+#ifdef GLAMOR_HAS_GBM
+    if (fbo->img_ext)
+      glBindTexture(GL_TEXTURE_EXTERNAL_OES, fbo->tex);
+    else
+#endif
+      glBindTexture(GL_TEXTURE_2D, fbo->tex);
 
     /* If we're pulling data from a GL_RED texture, then whether we
      * want to make it an A,0,0,0 result or a 0,0,0,R result depends

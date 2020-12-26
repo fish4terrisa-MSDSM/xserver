@@ -57,6 +57,19 @@ static const glamor_facet glamor_facet_copyarea = {
     .use = use_copyarea,
 };
 
+#ifdef GLAMOR_HAS_GBM
+static const glamor_facet glamor_facet_copyarea_img_ext = {
+    "copy_area",
+    .extensions = "#extension GL_OES_EGL_image_external : require\n",
+    .vs_vars = "attribute vec2 primitive;\n",
+    .vs_exec = (GLAMOR_POS(gl_Position, primitive.xy)
+                "       fill_pos = (fill_offset + primitive.xy) * fill_size_inv;\n"),
+    .fs_exec = "       gl_FragColor = texture2D(sampler, fill_pos);\n",
+    .locations = glamor_program_location_fillsamp_drm | glamor_program_location_fillpos,
+    .use = use_copyarea,
+};
+#endif
+
 /*
  * Configure the copy plane program for the current operation
  */
@@ -152,6 +165,24 @@ static const glamor_facet glamor_facet_copyplane = {
     .locations = glamor_program_location_fillsamp|glamor_program_location_fillpos|glamor_program_location_fg|glamor_program_location_bg|glamor_program_location_bitplane,
     .use = use_copyplane,
 };
+
+#ifdef GLAMOR_HAS_GBM
+static const glamor_facet glamor_facet_copyplane_img_ext = {
+    "copy_plane",
+    .version = 130,
+    .extensions = "#extension GL_OES_EGL_image_external : require\n",
+    .vs_vars = "attribute vec2 primitive;\n",
+    .vs_exec = (GLAMOR_POS(gl_Position, (primitive.xy))
+                "       fill_pos = (fill_offset + primitive.xy) * fill_size_inv;\n"),
+    .fs_exec = ("       uvec4 bits = uvec4(round(texture2D(sampler, fill_pos) * bitmul));\n"
+                "       if ((bits & bitplane) != uvec4(0,0,0,0))\n"
+                "               gl_FragColor = fg;\n"
+                "       else\n"
+                "               gl_FragColor = bg;\n"),
+    .locations = glamor_program_location_fillsamp_drm|glamor_program_location_fillpos|glamor_program_location_fg|glamor_program_location_bg|glamor_program_location_bitplane,
+    .use = use_copyplane,
+};
+#endif
 
 /*
  * When all else fails, pull the bits out of the GPU and do the
@@ -386,10 +417,23 @@ glamor_copy_fbo_fbo_draw(DrawablePtr src,
 
     if (bitplane) {
         prog = &glamor_priv->copy_plane_prog;
-        copy_facet = &glamor_facet_copyplane;
+#ifdef GLAMOR_HAS_GBM
+        if (src_priv->fbo->img_ext) {
+          copy_facet = &glamor_facet_copyplane_img_ext;
+          prog = &glamor_priv->copy_plane_img_ext_prog;
+        } else
+#endif
+          copy_facet = &glamor_facet_copyplane;
     } else {
         prog = &glamor_priv->copy_area_prog;
-        copy_facet = &glamor_facet_copyarea;
+#ifdef GLAMOR_HAS_GBM
+        if (src_priv->fbo->img_ext) {
+          copy_facet = &glamor_facet_copyarea_img_ext;
+          prog = &glamor_priv->copy_area_img_ext_prog;
+        }
+        else
+#endif
+          copy_facet = &glamor_facet_copyarea;
     }
 
     if (prog->failed)
