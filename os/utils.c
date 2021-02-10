@@ -261,8 +261,12 @@ static Bool nolock = FALSE;
 void
 LockServer(void)
 {
-    char tmp[PATH_MAX], pid_str[12];
-    int lfd, i, haslock, l_pid, t;
+    char pid_str[12];
+    const int attempts_nb = 3;
+    Bool haslock = FALSE;
+    int lfd, i, t, saved_errno, nb;
+    char * ptr;
+    long pid;
     const char *tmppath = LOCK_DIR;
     int len;
     char port[20];
@@ -278,112 +282,169 @@ LockServer(void)
     len += strlen(tmppath) + strlen(port) + strlen(LOCK_SUFFIX) + 1;
     if (len > sizeof(LockFile))
         FatalError("Display name `%s' is too long\n", port);
-    (void) sprintf(tmp, "%s" LOCK_TMP_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
-    (void) sprintf(LockFile, "%s" LOCK_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
+    snprintf(LockFile, sizeof(LockFile),
+             "%s" LOCK_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
 
     /*
-     * Create a temporary file containing our PID.  Attempt three times
-     * to create the file.
+     * Create a lock file containing our PID.  Attempt three times to create
+     * the file, sleeping 1s between attempts.
      */
     StillLocking = TRUE;
+    LogMessage(X_INFO, "Acquiring lock file %s...\n", LockFile);
     i = 0;
-    do {
+    while (!haslock && i < attempts_nb) {
         i++;
-        lfd = open(tmp, O_CREAT | O_EXCL | O_WRONLY, 0644);
-        if (lfd < 0)
-            sleep(2);
+
+        lfd = open(LockFile, O_CREAT | O_EXCL | O_WRONLY, 0644);
+
+        if (lfd < 0) {
+            if (errno == EEXIST) {
+                /*
+                 * Read the pid from the existing file
+                 */
+                lfd = open(LockFile, O_RDONLY | O_NOFOLLOW);
+                if (lfd < 0) {
+                    if (errno == EINTR)
+                        continue;
+                    else {
+                        LogMessage
+                            (X_INFO,
+                             "Lock file %s existed but couldn't be opened:\n"
+                             "\t%s\n"
+                             "It may have disappeared in the meantime.\n",
+                             LockFile, strerror(errno));
+                        goto sleep_and_retry;
+                    }
+                    /* Not reached */
+                }
+                nb = sizeof(pid_str) - 1;
+                ptr = pid_str;
+                while (1) {
+                    t = read(lfd, ptr, nb);
+
+                    if (t > 0) {
+                        nb -= t;
+                        ptr += t;
+
+                        if (nb == 0)
+                            break;
+                    } else if (t == 0)
+                        break;
+                    else if (errno == EINTR)
+                        continue;
+                    else
+                        break;
+                }
+                saved_errno = errno;
+                close(lfd);
+
+                if (nb > 0) {
+                    if (t < 0)
+                        LogMessage
+                            (X_WARNING,
+                             "Error reading opened lock file %s:\n\t%s\n",
+                             LockFile, strerror(saved_errno));
+                    else
+                        LogMessage
+                            (X_INFO,
+                             "Incomplete lock file %s present.\n"
+                             "\tAnother server may be still writing "
+                             "to it, or lock file is stale.\n",
+                             LockFile);
+
+                    goto sleep_and_retry;
+                }
+
+                pid_str[sizeof(pid_str) - 1] = '\0';
+                nb = sscanf(pid_str, "%ld", &pid);
+
+                if (nb == 0 || pid <= 0)
+                    // Here, clearly, it's not a race with another server that
+                    // is starting up. Something is very wrong, just bail out.
+                    FatalError
+                        ("Stale lock file %s present.\n"
+                         "\tLock file doesn't contain a valid pid, but %s.\n",
+                         LockFile, pid_str);
+
+                /*
+                 * Now report the PID.
+                 */
+                LogMessage
+                    (X_INFO,
+                     "Existing lock file containing PID %ld.\n"
+                     "\tSome server with this PID may still be active for "
+                     "display %s.\n",
+                     pid, port);
+                /* Clarity's sake (no-op). */
+                goto sleep_and_retry;
+            } else if (errno == EINTR) {
+                /* Just retry, without counting the interrupt. */
+                --i;
+                continue;
+            }
+            else
+                FatalError("Error while creating lock file %s:\n\t%s\n",
+                           LockFile, strerror(errno));
+
+          sleep_and_retry:
+            sleep(1);
+        }
         else
-            break;
-    } while (i < 3);
-    if (lfd < 0) {
-        unlink(tmp);
-        i = 0;
-        do {
-            i++;
-            lfd = open(tmp, O_CREAT | O_EXCL | O_WRONLY, 0644);
-            if (lfd < 0)
-                sleep(2);
+            haslock = TRUE;
+    }
+
+    if (haslock) {
+        snprintf(pid_str, sizeof(pid_str), "%10lu\n", (unsigned long) getpid());
+        nb = sizeof(pid_str) - 1;
+        ptr = pid_str;
+        while (1) {
+            t = write(lfd, ptr, nb);
+            if (t > 0) {
+                nb -= t;
+                ptr += t;
+
+                if (nb == 0)
+                    break;
+            } else if (errno == EINTR)
+                continue;
             else
                 break;
-        } while (i < 3);
-    }
-    if (lfd < 0)
-        FatalError("Could not create lock file in %s\n", tmp);
-    snprintf(pid_str, sizeof(pid_str), "%10lu\n", (unsigned long) getpid());
-    if (write(lfd, pid_str, 11) != 11)
-        FatalError("Could not write pid to lock file in %s\n", tmp);
-    (void) fchmod(lfd, 0444);
-    (void) close(lfd);
-
-    /*
-     * OK.  Now the tmp file exists.  Try three times to move it in place
-     * for the lock.
-     */
-    i = 0;
-    haslock = 0;
-    while ((!haslock) && (i++ < 3)) {
-        haslock = (link(tmp, LockFile) == 0);
-        if (haslock) {
-            /*
-             * We're done.
-             */
-            break;
         }
-        else if (errno == EEXIST) {
-            /*
-             * Read the pid from the existing file
-             */
-            lfd = open(LockFile, O_RDONLY | O_NOFOLLOW);
-            if (lfd < 0) {
-                unlink(tmp);
-                FatalError("Can't read lock file %s\n", LockFile);
-            }
-            pid_str[0] = '\0';
-            if (read(lfd, pid_str, 11) != 11) {
-                /*
-                 * Bogus lock file.
-                 */
-                unlink(LockFile);
-                close(lfd);
-                continue;
-            }
-            pid_str[11] = '\0';
-            sscanf(pid_str, "%d", &l_pid);
-            close(lfd);
 
-            /*
-             * Now try to kill the PID to see if it exists.
-             */
-            errno = 0;
-            t = kill(l_pid, 0);
-            if ((t < 0) && (errno == ESRCH)) {
-                /*
-                 * Stale lock file.
-                 */
-                unlink(LockFile);
-                continue;
-            }
-            else if (((t < 0) && (errno == EPERM)) || (t == 0)) {
-                /*
-                 * Process is still active.
-                 */
-                unlink(tmp);
-                FatalError
-                    ("Server is already active for display %s\n%s %s\n%s\n",
-                     port, "\tIf this server is no longer running, remove",
-                     LockFile, "\tand start again.");
-            }
+        if (nb > 0) {
+            unlink(LockFile);
+            FatalError("Could not write PID to lock file %s:\n\t%s\n",
+                       LockFile, strerror(errno));
         }
-        else {
-            unlink(tmp);
-            FatalError
-                ("Linking lock file (%s) in place failed: %s\n",
+
+        t = fchmod(lfd, 0444);
+        if (t < 0)
+            LogMessage
+                (X_WARNING,
+                 "Could not set permissions of the lock file %s:\n\t%s\n",
                  LockFile, strerror(errno));
+
+        while (1) {
+            t = close(lfd);
+            if (t == 0)
+                break;
+            else if (errno == EINTR)
+                continue;
+            else {
+                LogMessage
+                    (X_WARNING,
+                     "Could not properly close lock file %s:\n\t%s\n",
+                     LockFile, strerror(errno));
+            }
         }
+
+        LogMessage(X_INFO, "Lock file %s acquired and filled.\n", LockFile);
     }
-    unlink(tmp);
-    if (!haslock)
-        FatalError("Could not create server lock file: %s\n", LockFile);
+    else
+        FatalError
+            ("Could not acquire server lock file %s within %d attempts.\n",
+             LockFile, attempts_nb);
+
     StillLocking = FALSE;
 }
 
