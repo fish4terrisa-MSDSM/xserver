@@ -36,6 +36,7 @@ Bool xwl_shm_create_screen_resources(ScreenPtr screen);
 PixmapPtr xwl_shm_create_pixmap(ScreenPtr screen, int width, int height,
                                 int depth, unsigned int hint);
 Bool xwl_shm_destroy_pixmap(PixmapPtr pixmap);
-struct wl_buffer *xwl_shm_pixmap_get_wl_buffer(PixmapPtr pixmap);
+Bool xwl_shm_reinit_pixmap(struct xwl_screen *xwl_screen, PixmapPtr pixmap);
+struct wl_buffer *xwl_shm_pixmap_get_wl_buffer(struct xwl_screen *xwl_screen, PixmapPtr pixmap);
 
 #endif /* XWAYLAND_SHM_H */

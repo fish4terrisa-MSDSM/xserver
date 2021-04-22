@@ -1684,6 +1684,16 @@ xwl_cursor_init(struct xwl_cursor *xwl_cursor, struct xwl_screen *xwl_screen,
 }
 
 static void
+xwl_cursor_release(struct xwl_cursor *xwl_cursor)
+{
+    wl_surface_destroy(xwl_cursor->surface);
+    xwl_cursor->surface = NULL;
+    if (xwl_cursor->frame_cb)
+        wl_callback_destroy(xwl_cursor->frame_cb);
+    xwl_cursor->frame_cb = NULL;
+}
+
+static void
 xwl_seat_update_cursor(struct xwl_cursor *xwl_cursor)
 {
     struct xwl_seat *xwl_seat = wl_container_of(xwl_cursor, xwl_seat, cursor);
@@ -1750,6 +1760,10 @@ xwl_seat_destroy(struct xwl_seat *xwl_seat)
     release_grab(xwl_seat);
     wl_seat_destroy(xwl_seat->seat);
     xwl_cursor_release(&xwl_seat->cursor);
+    if (xwl_seat->x_cursor_timer) {
+        TimerFree(xwl_seat->x_cursor_timer);
+        xwl_seat->x_cursor_timer = NULL;
+    }
     wl_array_release(&xwl_seat->keys);
     free(xwl_seat);
 }
@@ -3322,6 +3336,38 @@ InitInput(int argc, char *argv[])
     pScreen->XYToWindow = xwl_xy_to_window;
 
     xwl_screen_roundtrip(xwl_screen);
+}
+
+void xwl_input_teardown(struct xwl_screen* xwl_screen)
+{
+    wl_registry_destroy(xwl_screen->input_registry);
+    xwl_screen->input_registry = NULL;
+
+    if (xwl_screen->tablet_manager)
+        zwp_tablet_manager_v2_destroy(xwl_screen->tablet_manager);
+    xwl_screen->tablet_manager = NULL;
+
+    if (xwl_screen->relative_pointer_manager)
+        zwp_relative_pointer_manager_v1_destroy(xwl_screen->relative_pointer_manager);
+    xwl_screen->relative_pointer_manager = NULL;
+
+    if (xwl_screen->pointer_constraints)
+        zwp_pointer_constraints_v1_destroy(xwl_screen->pointer_constraints);
+    xwl_screen->pointer_constraints = NULL;
+
+    if (xwl_screen->wp_grab)
+        zwp_xwayland_keyboard_grab_manager_v1_destroy(xwl_screen->wp_grab);
+    xwl_screen->wp_grab = NULL;
+
+    // all seats are cleaned up explicitly in xwl_screen
+}
+
+
+void xwl_input_reconnect(struct xwl_screen *xwl_screen)
+{
+    xwl_screen->input_registry = wl_display_get_registry(xwl_screen->display);
+    wl_registry_add_listener(xwl_screen->input_registry, &input_listener,
+                             xwl_screen);
 }
 
 void
