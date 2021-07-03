@@ -289,6 +289,11 @@ glamor_pixmap_attach_fbo(PixmapPtr pixmap, glamor_pixmap_fbo *fbo)
 
     pixmap_priv->fbo = fbo;
 
+#ifdef GLAMOR_HAS_GBM
+    if (pixmap_priv->image)
+        fbo->img_ext = TRUE;
+#endif
+
     switch (pixmap_priv->type) {
     case GLAMOR_TEXTURE_ONLY:
     case GLAMOR_TEXTURE_DRM:
