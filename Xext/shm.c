@@ -1218,6 +1218,22 @@ ProcShmAttachFd(ClientPtr client)
     return ProcShmAttachFdCommon(client, 0, size, fd);
 }
 
+#ifndef X_ShmAttachFdExt
+#define X_ShmAttachFdExt                8
+
+typedef struct {
+    CARD8	reqType;	/* always ShmReqCode */
+    CARD8	shmReqType;	/* always X_ShmAttachFdExt */
+    CARD16	length;
+    CARD32	shmseg;
+    BOOL	readOnly;
+    BYTE	pad0;
+    CARD16	pad1;
+    CARD32	size;		/* size of the buffer */
+    CARD64	offset;		/* offset to pass to mmap() */
+} xShmAttachFdExtReq;
+#endif
+
 static int
 ProcShmAttachFdExt(ClientPtr client)
 {
