@@ -53,6 +53,7 @@
 #include "xwayland-pixmap.h"
 #include "xwayland-present.h"
 #include "xwayland-shm.h"
+#include "xwayland-window-buffers.h"
 
 #ifdef MITSHM
 #include "shmint.h"
@@ -773,11 +774,22 @@ void
 xwl_screen_set_global_scale(struct xwl_screen *xwl_screen, int32_t scale)
 {
     struct xwl_output *it;
+    struct xwl_window *xwl_window;
+
     xwl_screen->global_output_scale = scale;
 
     /* change randr resolutions and positions */
     xorg_list_for_each_entry(it, &xwl_screen->output_list, link) {
         xwl_output_apply_changes(it);
+    }
+
+    if (!xwl_screen->rootless && xwl_screen->screen->root) {
+        /* Clear all the buffers, so that they'll be remade with the new sizes
+         * (this doesn't occur automatically because as far as Xorg is
+         *  concerned, the window's size is the same) */
+        xorg_list_for_each_entry(xwl_window, &xwl_screen->window_list, link_window) {
+            xwl_window_buffers_recycle(xwl_window);
+        }
     }
 }
 
