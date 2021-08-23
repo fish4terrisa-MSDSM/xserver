@@ -131,6 +131,7 @@ struct xwl_screen {
     struct glamor_context *glamor_ctx;
 
     Atom allow_commits_prop;
+    Atom global_output_scale_prop;
 
     /* The preferred GLVND vendor. If NULL, "mesa" is assumed. */
     const char *glvnd_vendor;

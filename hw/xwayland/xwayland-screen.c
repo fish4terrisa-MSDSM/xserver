@@ -42,6 +42,8 @@
 #include <propertyst.h>
 #include <inputstr.h>
 #include <xserver_poll.h>
+#include <xace.h>
+#include <xacestr.h>
 
 #include "xwayland-cursor.h"
 #include "xwayland-screen.h"
@@ -143,25 +145,79 @@ xwl_screen_get_fixed_or_first_output(struct xwl_screen *xwl_screen)
 }
 
 static void
+xwl_screen_set_global_scale_from_property(struct xwl_screen *screen,
+                                          PropertyPtr prop)
+{
+    CARD32 *propdata;
+
+    if (prop->type != XA_CARDINAL || prop->format != 32 || prop->size != 1) {
+        // TODO: handle warnings more cleanly.
+        LogMessageVerb(X_WARNING, 0, "Bad value for property %s.\n",
+                       NameForAtom(prop->propertyName));
+        return;
+    }
+
+    propdata = prop->data;
+    xwl_screen_set_global_scale(screen, propdata[0]);
+}
+
+static void
+xwl_screen_update_property(struct xwl_screen *screen,
+                           PropertyStateRec *propstate)
+{
+    switch (propstate->state) {
+    case PropertyNewValue:
+        xwl_screen_set_global_scale_from_property(screen, propstate->prop);
+        break;
+    case PropertyDelete:
+        xwl_screen_set_global_scale(screen, 1);
+        break;
+    }
+}
+
+static void
+xwl_screen_validate_property_access(CallbackListPtr *pcbl,
+                                    void *userdata,
+                                    void *calldata)
+{
+    XacePropertyAccessRec *rec = calldata;
+    struct xwl_screen *xwl_screen = userdata;
+    ATOM name = (*rec->ppProp)->propertyName;
+
+    if (name == xwl_screen->global_output_scale_prop &&
+        rec->client->index != xwl_screen->wm_client_id) {
+        LogMessageVerb(X_WARNING, 0,
+                       "Client %x tried to illegaly set %s on the root window.\n",
+                       rec->client->index, NameForAtom(name));
+        rec->status = BadAccess;
+    }
+}
+
+static void
 xwl_property_callback(CallbackListPtr *pcbl, void *closure,
                       void *calldata)
 {
     ScreenPtr screen = closure;
     PropertyStateRec *rec = calldata;
     struct xwl_screen *xwl_screen;
-    struct xwl_window *xwl_window;
 
     if (rec->win->drawable.pScreen != screen)
         return;
 
-    xwl_window = xwl_window_get(rec->win);
-    if (!xwl_window)
-        return;
-
     xwl_screen = xwl_screen_get(screen);
 
-    if (rec->prop->propertyName == xwl_screen->allow_commits_prop)
+    if (rec->prop->propertyName == xwl_screen->allow_commits_prop) {
+        struct xwl_window *xwl_window;
+
+        xwl_window = xwl_window_get(rec->win);
+        if (!xwl_window)
+            return;
+
         xwl_window_update_property(xwl_window, rec);
+    }
+    else if (rec->prop->propertyName == xwl_screen->global_output_scale_prop) {
+        xwl_screen_update_property(xwl_screen, rec);
+    }
 }
 
 static void
@@ -729,6 +785,7 @@ Bool
 xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
 {
     static const char allow_commits[] = "_XWAYLAND_ALLOW_COMMITS";
+    static const char global_output_scale[] = "_XWAYLAND_GLOBAL_OUTPUT_SCALE";
     struct xwl_screen *xwl_screen;
     Pixel red_mask, blue_mask, green_mask;
     int ret, bpc, green_bpc, i;
@@ -1006,8 +1063,16 @@ xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
     if (xwl_screen->allow_commits_prop == BAD_RESOURCE)
         return FALSE;
 
+    xwl_screen->global_output_scale_prop = MakeAtom(global_output_scale,
+                                                    strlen(global_output_scale),
+                                                    TRUE);
+    if (xwl_screen->global_output_scale_prop == BAD_RESOURCE)
+        return FALSE;
+
     AddCallback(&PropertyStateCallback, xwl_property_callback, pScreen);
     AddCallback(&RootWindowFinalizeCallback, xwl_root_window_finalized_callback, pScreen);
+
+    XaceRegisterCallback(XACE_PROPERTY_ACCESS, xwl_screen_validate_property_access, xwl_screen);
 
     xwl_screen_setup_custom_vector(xwl_screen);
 
