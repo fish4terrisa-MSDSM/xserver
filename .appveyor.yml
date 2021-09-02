@@ -27,6 +27,7 @@ meson,\
 ninja,\
 pkg-config,\
 python3,\
+xz,\
 windowsdriproto,\
 xorgproto,\
 libdmx-devel,\
@@ -65,20 +66,25 @@ khronos-opengl-registry,\
 python3-lxml,\
 xkbcomp-devel,\
 xkeyboard-config,\
-xtrans"
+xtrans,\
+python36-mako,\
+python36-six"
 - echo Install done
 - "%CYGWIN_ROOT%\\%SETUP% -qnNdO -R %CYGWIN_ROOT% -s %CYGWIN_MIRROR% -l %CACHE% -g"
 cache:
 - C:\cache
 - '%CYGWIN_ROOT%\home\%USERNAME%\.ccache'
 build_script:
+- SET ORIG_PATH=%PATH%
 - SET PATH=%CYGWIN_ROOT%/bin
-- '%CYGWIN_ROOT%/bin/bash -lc "cd $APPVEYOR_BUILD_FOLDER; meson setup --prefix=/usr -Dxv=false -Dxf86bigfont=true -Ddmx=true -Dxephyr=true -Dxnest=true -Dxvfb=true -Dxwin=true -Dxorg=true -Dhal=false -Dudev=false -Dpciaccess=false -Dint10=false build"'
-- '%CYGWIN_ROOT%/bin/bash -lc "cd $APPVEYOR_BUILD_FOLDER; meson configure build"'
-- '%CYGWIN_ROOT%/bin/bash -lc "cd $APPVEYOR_BUILD_FOLDER; ninja -C build"'
+- '%CYGWIN_ROOT%/bin/bash -lc "cd $APPVEYOR_BUILD_FOLDER; ./test/scripts/build-appveyor.sh"'
 - '%CYGWIN_ROOT%/bin/bash -lc "cd $APPVEYOR_BUILD_FOLDER; ccache -s"'
-test_script:
-- '%CYGWIN_ROOT%/bin/bash -lc "cd $APPVEYOR_BUILD_FOLDER; ninja -C build test"'
-after_test:
-- '%CYGWIN_ROOT%/bin/bash -lc "cd $APPVEYOR_BUILD_FOLDER; ninja -C build install"'
 deploy: off
+test: off
+# publish log artifacts on success or failure
+on_finish:
+- tar --ignore-failed-read -Jcf meson-log.tar.xz build/meson-logs
+- tar --ignore-failed-read -Jcf xvfb-piglit.tar.xz build/test/piglit-results/xvfb
+- SET PATH=%ORIG_PATH%
+- appveyor PushArtifact meson-log.tar.xz
+- appveyor PushArtifact xvfb-piglit.tar.xz
