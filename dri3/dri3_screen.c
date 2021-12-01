@@ -272,3 +272,19 @@ dri3_get_supported_modifiers(ScreenPtr screen, DrawablePtr drawable,
 
     return Success;
 }
+
+int
+dri3_set_drm_device_in_use(WindowPtr window,
+                           CARD32 drmMajor,
+                           CARD32 drmMinor)
+{
+    dri3_screen_priv_ptr        ds = dri3_screen_priv(window->drawable.pScreen);
+    const dri3_screen_info_rec *info = ds->info;
+
+    if (info->set_drm_device_in_use &&
+        !info->set_drm_device_in_use(window, drmMajor, drmMinor)) {
+        return BadWindow;
+    }
+
+    return Success;
+}

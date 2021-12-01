@@ -875,6 +875,8 @@ static const dri3_screen_info_rec glamor_dri3_info = {
     .get_formats = glamor_get_formats,
     .get_modifiers = glamor_get_modifiers,
     .get_drawable_modifiers = glamor_get_drawable_modifiers,
+    /* this is only needed in xwayland */
+    .set_drm_device_in_use = NULL,
 };
 #endif /* DRI3 */
 

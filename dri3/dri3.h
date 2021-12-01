@@ -84,6 +84,10 @@ typedef int (*dri3_get_drawable_modifiers_proc) (DrawablePtr draw,
                                                  uint32_t *num_modifiers,
                                                  uint64_t **modifiers);
 
+typedef int (*dri3_set_drm_device_in_use_proc) (WindowPtr window,
+                                                uint32_t drmMajor,
+                                                uint32_t drmMinor);
+
 typedef struct dri3_screen_info {
     uint32_t                    version;
 
@@ -100,6 +104,7 @@ typedef struct dri3_screen_info {
     dri3_get_formats_proc       get_formats;
     dri3_get_modifiers_proc     get_modifiers;
     dri3_get_drawable_modifiers_proc get_drawable_modifiers;
+    dri3_set_drm_device_in_use_proc set_drm_device_in_use;
 
 } dri3_screen_info_rec, *dri3_screen_info_ptr;
 

@@ -53,6 +53,16 @@ struct xwl_present_window {
     struct xorg_list idle_queue;
 
     present_vblank_ptr flip_active;
+    /*
+     * Clients may notify us which DRM device they are using through
+     * DRI3SetDRMDeviceInUse so that we can return format/modifier info
+     * to them.
+     *
+     * We track this here since the xwl_window may be destroyed when the
+     * window is unmapped.
+     */
+    dev_t drm_dev_in_use;
+    int drm_dev_in_use_set;
 };
 
 struct xwl_present_event {
@@ -61,6 +71,7 @@ struct xwl_present_event {
     PixmapPtr pixmap;
 };
 
+struct xwl_present_window *xwl_present_window_get_priv(WindowPtr window);
 void xwl_present_reset_timer(struct xwl_present_window *xwl_present_window);
 void xwl_present_frame_callback(struct xwl_present_window *xwl_present_window);
 Bool xwl_present_init(ScreenPtr screen);
