@@ -295,6 +295,38 @@ xwl_shm_create_pixmap(ScreenPtr screen,
     return NULL;
 }
 
+Bool xwl_shm_reinit_pixmap(struct xwl_screen *xwl_screen, PixmapPtr pixmap)
+{
+    struct xwl_pixmap *xwl_pixmap = xwl_pixmap_get(pixmap);
+    int fd;
+    struct wl_shm_pool *pool;
+
+    fd = os_create_anonymous_file(xwl_pixmap->size);
+    if (fd < 0)
+        return FALSE;
+
+    // re-mmap the same address as before
+    // this should keep the old data but give us a new FD we can export
+
+    // DAVE alternatively we could just remap and memcpy? Might be safer
+    xwl_pixmap->data = mmap(xwl_pixmap->data, xwl_pixmap->size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
+    if (xwl_pixmap->data == MAP_FAILED)
+        return FALSE;
+
+    int format = shm_format_for_depth(pixmap->drawable.depth);
+    pool = wl_shm_create_pool(xwl_screen->shm, fd, xwl_pixmap->size);
+    xwl_pixmap->buffer = wl_shm_pool_create_buffer(pool, 0,
+                                                   pixmap->drawable.width,
+                                                   pixmap->drawable.height,
+                                                   pixmap->devKind, format);
+    wl_shm_pool_destroy(pool);
+    close(fd);
+
+    wl_buffer_add_listener(xwl_pixmap->buffer,
+                           &xwl_shm_buffer_listener, pixmap);
+    return TRUE;
+}
+
 Bool
 xwl_shm_destroy_pixmap(PixmapPtr pixmap)
 {
@@ -312,9 +344,29 @@ xwl_shm_destroy_pixmap(PixmapPtr pixmap)
 }
 
 struct wl_buffer *
-xwl_shm_pixmap_get_wl_buffer(PixmapPtr pixmap)
+xwl_shm_pixmap_get_wl_buffer(struct xwl_screen *xwl_screen, PixmapPtr pixmap)
 {
-    return xwl_pixmap_get(pixmap)->buffer;
+    struct xwl_pixmap *xwl_pixmap = xwl_pixmap_get(pixmap);
+    if (!xwl_pixmap) {
+        return NULL;
+    }
+
+    // whilst we manually re-initialise everything we potentially lose
+    // some buffers stored as pixmaps throughout.
+
+    // because I don't know of a good way to fetch a list of all pixmaps
+    // we re-initialise them if any survive and get accessed again
+
+    // so far this has come up just for cursors
+
+    // maybe we could put a reconnect handler in every xwl_pixmap
+    if (wl_proxy_get_is_defunct((struct wl_proxy *) xwl_pixmap->buffer)) {
+        if (!xwl_shm_reinit_pixmap(xwl_screen, pixmap)) {
+            return NULL;
+        }
+    }
+
+    return xwl_pixmap->buffer;
 }
 
 Bool

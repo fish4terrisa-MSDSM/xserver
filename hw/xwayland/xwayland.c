@@ -240,7 +240,10 @@ xwl_log_handler(const char *format, va_list args)
     char msg[256];
 
     vsnprintf(msg, sizeof msg, format, args);
-    FatalError("%s", msg);
+    // Dave - this was a temporary change as I made libwayland warn when defunct objects were used
+    // seemed sensible, but this shows I need to change that..
+    //     FatalError("%s", msg);
+    printf("%s\n", msg);
 }
 
 static const ExtensionModule xwayland_extensions[] = {

@@ -554,6 +554,56 @@ xwl_realize_window(WindowPtr window)
     return ensure_surface_for_window(window);
 }
 
+void xwl_window_reset(WindowPtr window)
+{
+    ScreenPtr screen = window->drawable.pScreen;
+    struct xwl_screen *xwl_screen;
+    struct xwl_window *xwl_window;
+    struct xwl_seat *xwl_seat;
+    Bool ret;
+
+    xwl_screen = xwl_screen_get(screen);
+
+    xorg_list_for_each_entry(xwl_seat, &xwl_screen->seat_list, link) {
+        if (xwl_seat->focus_window && xwl_seat->focus_window->window == window)
+            xwl_seat->focus_window = NULL;
+        if (xwl_seat->tablet_focus_window && xwl_seat->tablet_focus_window->window == window)
+            xwl_seat->tablet_focus_window = NULL;
+        if (xwl_seat->last_xwindow == window)
+            xwl_seat->last_xwindow = NullWindow;
+        if (xwl_seat->cursor_confinement_window &&
+            xwl_seat->cursor_confinement_window->window == window)
+            xwl_seat_unconfine_pointer(xwl_seat);
+        if (xwl_seat->pointer_warp_emulator &&
+            xwl_seat->pointer_warp_emulator->locked_window &&
+            xwl_seat->pointer_warp_emulator->locked_window->window == window)
+            xwl_seat_destroy_pointer_warp_emulator(xwl_seat);
+        xwl_seat_clear_touch(xwl_seat, window);
+    }
+
+    compUnredirectWindow(serverClient, window, CompositeRedirectManual);
+
+    xwl_window = xwl_window_get(window);
+
+    if (xwl_window_has_viewport_enabled(xwl_window))
+        xwl_window_disable_viewport(xwl_window);
+
+    wl_surface_destroy(xwl_window->surface);
+
+    if (xwl_window->frame_callback)
+        wl_callback_destroy(xwl_window->frame_callback);
+
+    xwl_window->surface = wl_compositor_create_surface(xwl_screen->compositor);
+    wl_display_flush(xwl_screen->display);
+
+    send_surface_id_event(xwl_window);
+
+    wl_surface_set_user_data(xwl_window->surface, xwl_window);
+
+    compRedirectWindow(serverClient, window, CompositeRedirectManual);
+}
+
+
 Bool
 xwl_unrealize_window(WindowPtr window)
 {
@@ -803,7 +853,7 @@ xwl_window_post_damage(struct xwl_window *xwl_window)
         buffer = xwl_glamor_pixmap_get_wl_buffer(pixmap);
     else
 #endif
-        buffer = xwl_shm_pixmap_get_wl_buffer(pixmap);
+        buffer = xwl_shm_pixmap_get_wl_buffer(xwl_screen, pixmap);
 
     if (!buffer) {
         ErrorF("Error getting buffer\n");

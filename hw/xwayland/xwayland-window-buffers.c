@@ -365,3 +365,15 @@ xwl_window_buffers_get_pixmap(struct xwl_window *xwl_window,
 
     return xwl_window_buffer->pixmap;
 }
+
+void xwl_window_buffers_handle_reset(struct xwl_screen *xwl_screen, struct xwl_window *xwl_window)
+{
+    struct xwl_window_buffer *buffer;
+    xorg_list_for_each_entry(buffer, &xwl_window->window_buffers_available, link_buffer) {
+        xwl_window_buffer_release_callback(buffer);
+    }
+    xorg_list_for_each_entry(buffer, &xwl_window->window_buffers_unavailable, link_buffer) {
+        xwl_window_buffer_release_callback(buffer);
+    }
+
+}

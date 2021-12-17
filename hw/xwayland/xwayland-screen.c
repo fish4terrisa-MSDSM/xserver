@@ -51,6 +51,7 @@
 #include "xwayland-pixmap.h"
 #include "xwayland-present.h"
 #include "xwayland-shm.h"
+#include "xwayland-window-buffers.h"
 
 #ifdef MITSHM
 #include "shmint.h"
@@ -64,6 +65,8 @@ static DevPrivateKeyRec xwl_screen_private_key;
 static DevPrivateKeyRec xwl_client_private_key;
 
 #define DEFAULT_DPI 96
+
+static void xwl_reconnect(struct xwl_screen *xwl_screen);
 
 _X_NORETURN
 static void _X_ATTRIBUTE_PRINTF(1, 2)
@@ -470,18 +473,22 @@ xwl_read_events (struct xwl_screen *xwl_screen)
 {
     int ret;
 
-    if (xwl_screen->wait_flush)
+    if (xwl_screen->wait_flush) {
         return;
+    }
 
     ret = wl_display_read_events(xwl_screen->display);
-    if (ret == -1)
-        xwl_give_up("failed to read Wayland events: %s\n", strerror(errno));
+    if (ret == -1) {
+    }
 
     xwl_screen->prepare_read = 0;
 
     ret = wl_display_dispatch_pending(xwl_screen->display);
-    if (ret == -1)
+    if (ret == -1) {
+        xwl_reconnect(xwl_screen);
+        return;
         xwl_give_up("failed to dispatch Wayland events: %s\n", strerror(errno));
+    }
 }
 
 static int
@@ -523,8 +530,7 @@ pollout:
         ret = wl_display_flush(xwl_screen->display);
 
     if (ret == -1 && errno != EAGAIN)
-        xwl_give_up("failed to write to XWayland fd: %s\n", strerror(errno));
-
+        xwl_reconnect(xwl_screen);
     xwl_screen->wait_flush = (ready == 0 || ready == -1 || ret == -1);
 }
 
@@ -532,7 +538,6 @@ static void
 socket_handler(int fd, int ready, void *data)
 {
     struct xwl_screen *xwl_screen = data;
-
     xwl_read_events (xwl_screen);
 }
 
@@ -742,8 +747,9 @@ xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
         }
     }
 
-    if (xwl_screen->glamor && xwl_screen->rootless)
+    if (xwl_screen->glamor && xwl_screen->rootless) {
         xwl_screen->present = xwl_present_init(pScreen);
+    }
 #endif
 
     if (!xwl_screen->glamor) {
@@ -794,4 +800,74 @@ xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
     xwl_screen_roundtrip(xwl_screen);
 
     return ret;
+}
+
+static void xwl_reconnect(struct xwl_screen *xwl_screen) {
+    struct xwl_output *xwl_output, *tmp_xwl_output;
+    struct xwl_window *xwl_window, *tmp_xwl_window;
+    struct xwl_seat *xwl_seat, *next_xwl_seat;
+    struct xwl_window_buffer *xwl_window_buffer;
+
+
+    // TODO, we probably want something to stop infinite loops if xwayland goes wrong?
+    printf("reconnect!!!!\n");
+
+    RemoveNotifyFd(xwl_screen->wayland_fd);
+
+    xorg_list_for_each_entry_safe(xwl_output, tmp_xwl_output,
+                                  &xwl_screen->output_list, link) {
+        xwl_output_remove(xwl_output);
+    }
+    xorg_list_init(&xwl_screen->output_list);
+
+    xorg_list_for_each_entry_safe(xwl_seat, next_xwl_seat,
+                                  &xwl_screen->seat_list, link) {
+            xwl_seat_destroy(xwl_seat);
+    }
+    xorg_list_init(&xwl_screen->seat_list);
+
+    wl_compositor_destroy(xwl_screen->compositor);
+    xwl_screen->compositor = NULL;
+
+    wl_registry_destroy(xwl_screen->registry);
+    xwl_screen->registry = NULL;
+
+    xdg_wm_base_destroy(xwl_screen->xdg_wm_base);
+    xwl_screen->xdg_wm_base = NULL;
+
+    wl_shell_destroy(xwl_screen->shm);
+    xwl_screen->shm = NULL;
+
+    zxdg_output_manager_v1_destroy(xwl_screen->xdg_output_manager);
+    xwl_screen->xdg_output_manager = NULL;
+    xwl_screen->viewporter = NULL;
+
+    xwl_screen->wm_client_id = -1;
+    xwl_screen->expecting_event = 0;
+    xwl_screen->prepare_read = 0;
+
+    xwl_input_teardown(xwl_screen);
+
+    wl_display_reconnect(xwl_screen->display);
+
+    xwl_screen->registry = wl_display_get_registry(xwl_screen->display);
+    wl_registry_add_listener(xwl_screen->registry,
+                             &registry_listener, xwl_screen);
+
+    xwl_screen->wayland_fd = wl_display_get_fd(xwl_screen->display);
+    SetNotifyFd(xwl_screen->wayland_fd, socket_handler, X_NOTIFY_READ, xwl_screen);
+    RegisterBlockAndWakeupHandlers(block_handler, wakeup_handler, xwl_screen);
+
+    xwl_screen->wait_flush = FALSE;
+
+    xwl_input_reconnect(xwl_screen);
+
+    xwl_screen_roundtrip(xwl_screen);
+
+    // reset all windows, this implicitly handles buffers
+    xorg_list_for_each_entry_safe(xwl_window, tmp_xwl_window, &xwl_screen->window_list, link_window) {
+        WindowPtr windowPtr = xwl_window->window;
+        xwl_unrealize_window(windowPtr);
+        xwl_realize_window(windowPtr);
+    }
 }

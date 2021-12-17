@@ -82,5 +82,6 @@ Bool xwl_destroy_window(WindowPtr window);
 void xwl_window_post_damage(struct xwl_window *xwl_window);
 void xwl_window_create_frame_callback(struct xwl_window *xwl_window);
 Bool xwl_window_init(void);
+void xwl_window_reset(WindowPtr window);
 
 #endif /* XWAYLAND_WINDOW_H */

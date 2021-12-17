@@ -153,13 +153,15 @@ static void
 xwl_cursor_attach_pixmap(struct xwl_seat *xwl_seat,
                          struct xwl_cursor *xwl_cursor, PixmapPtr pixmap)
 {
-    struct wl_buffer *buffer;
-
-    buffer = xwl_shm_pixmap_get_wl_buffer(pixmap);
-    if (!buffer) {
-        ErrorF("cursor: Error getting buffer\n");
+    struct wl_buffer * buffer = xwl_shm_pixmap_get_wl_buffer(xwl_seat->xwl_screen, pixmap);
+    if (!buffer)
         return;
-    }
+
+    // DAVE - this comes up because wl_output#s update_screen_size can trigger cursor updates before we have the seat redone.
+    // ideally we would defer that call until after the reconnect's roundtrip is done?
+    // or make sure X11 cleans up the seat properly when the seat is actually deleted so none of these callbacks on output change happen?
+    if (!xwl_cursor->surface)
+        return;
 
     wl_surface_attach(xwl_cursor->surface, buffer, 0, 0);
     xwl_surface_damage(xwl_seat->xwl_screen, xwl_cursor->surface, 0, 0,
