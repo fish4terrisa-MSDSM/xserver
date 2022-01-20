@@ -76,6 +76,15 @@ from The Open Group.
 #define VFB_DEFAULT_LINEBIAS      0
 #define XWD_WINDOW_NAME_LEN      60
 
+#if RANDR_12_INTERFACE
+typedef struct Dimension Dimension;
+typedef struct Dimension {
+    int width;
+    int height;
+    Dimension* next;
+} Dimension;
+#endif
+
 typedef struct {
     int width;
     int paddedBytesWidth;
@@ -92,6 +101,10 @@ typedef struct {
     Pixel whitePixel;
     unsigned int lineBias;
     CloseScreenProcPtr closeScreen;
+#if RANDR_12_INTERFACE
+    Dimension *dimension;
+    int numModes;
+#endif
 
 #ifdef HAVE_MMAP
     int mmap_fd;
@@ -278,7 +291,7 @@ ddxProcessArgument(int argc, char *argv[], int i)
         int screenNum;
 
         CHECK_FOR_REQUIRED_ARGUMENTS(2);
-        screenNum = atoi(argv[i + 1]);
+        screenNum = atoi(argv[++i]);
         /* The protocol only has a CARD8 for number of screens in the
            connection setup block, so don't allow more than that. */
         if ((screenNum < 0) || (screenNum >= 255)) {
@@ -297,18 +310,45 @@ ddxProcessArgument(int argc, char *argv[], int i)
                 vfbScreens[vfbNumScreens] = defaultScreenInfo;
         }
 
-        if (3 != sscanf(argv[i + 2], "%dx%dx%d",
+        if (3 != sscanf(argv[++i], "%dx%dx%d",
                         &vfbScreens[screenNum].width,
                         &vfbScreens[screenNum].height,
                         &vfbScreens[screenNum].depth)) {
-            ErrorF("Invalid screen configuration %s\n", argv[i + 2]);
+            ErrorF("Invalid screen configuration %s\n", argv[i]);
             UseMsg();
             FatalError("Invalid screen configuration %s for -screen %d\n",
-                       argv[i + 2], screenNum);
+                       argv[i], screenNum);
         }
+        int ret = 3;
+#if RANDR_12_INTERFACE
+        vfbScreens[screenNum].dimension = malloc(sizeof(Dimension));
+        vfbScreens[screenNum].dimension->width = vfbScreens[screenNum].width;
+        vfbScreens[screenNum].dimension->height = vfbScreens[screenNum].height;
+        vfbScreens[screenNum].numModes = 1;
 
+        Dimension *cur = vfbScreens[screenNum].dimension;
+        while (++i < argc) {
+            if (*argv[i] == '-')
+                break;
+            ret++;
+            Dimension *new = malloc(sizeof(Dimension));
+            if (2 != sscanf(argv[i], "%dx%d", &new->width, &new->height)) {
+                    ErrorF("Invalid screen configuration %s\n", argv[i]);
+                    UseMsg();
+                    FatalError("Invalid screen configuration %s for -screen %d\n",
+                               argv[i], screenNum);
+            }
+            if (new->width > vfbScreens[screenNum].width)
+                vfbScreens[screenNum].width = new->width;
+            if (new->height > vfbScreens[screenNum].height)
+                vfbScreens[screenNum].height = new->height;
+            vfbScreens[screenNum].numModes++;
+            cur = cur->next = new;
+        }
+        cur->next = NULL;
+#endif
         lastScreen = screenNum;
-        return 3;
+        return ret;
     }
 
     if (strcmp(argv[i], "-pixdepths") == 0) {   /* -pixdepths list-of-depth */
@@ -802,6 +842,21 @@ vfbRandRInit(ScreenPtr pScreen)
     RROutputPtr        output;
     xRRModeInfo modeInfo;
     char       name[64];
+    vfbScreenInfoPtr pvfb = &vfbScreens[pScreen->myNum];
+
+    int maxWidth = pScreen->width;
+    int maxHeight = pScreen->height;
+
+    if (pvfb->numModes == 0) {
+        pvfb->dimension = malloc(sizeof(Dimension));
+        pvfb->dimension->width = pScreen->width;
+        pvfb->dimension->height = pScreen->height;
+        pvfb->dimension->next = NULL;
+        pvfb->numModes++;
+    }
+
+    pScreen->width = pvfb->dimension->width;
+    pScreen->height = pvfb->dimension->height;
 #endif
 
     if (!RRScreenInit (pScreen))
@@ -820,17 +875,23 @@ vfbRandRInit(ScreenPtr pScreen)
 
     RRScreenSetSizeRange (pScreen,
                          1, 1,
-                         pScreen->width, pScreen->height);
+                         maxWidth, maxHeight);
 
-    sprintf (name, "%dx%d", pScreen->width, pScreen->height);
-    memset (&modeInfo, '\0', sizeof (modeInfo));
-    modeInfo.width = pScreen->width;
-    modeInfo.height = pScreen->height;
-    modeInfo.nameLength = strlen (name);
+    RRModePtr *modes = xallocarray(pvfb->numModes, sizeof(RRModePtr));
+    Dimension *cur = pvfb->dimension;
+    for (int i=0; i<pvfb->numModes; i++) {
+        sprintf (name, "%dx%d", cur->width, cur->height);
+        memset (&modeInfo, '\0', sizeof (modeInfo));
+        modeInfo.width = cur->width;
+        modeInfo.height = cur->height;
+        modeInfo.nameLength = strlen (name);
 
-    mode = RRModeGet (&modeInfo, name);
-    if (!mode)
-       return FALSE;
+        mode = RRModeGet (&modeInfo, name);
+        if (!mode)
+            return FALSE;
+        *(modes+i) = mode;
+        cur = cur->next;
+    }
 
     crtc = RRCrtcCreate (pScreen, NULL);
     if (!crtc)
@@ -844,13 +905,13 @@ vfbRandRInit(ScreenPtr pScreen)
        return FALSE;
     if (!RROutputSetClones (output, NULL, 0))
        return FALSE;
-    if (!RROutputSetModes (output, &mode, 1, 0))
+    if (!RROutputSetModes (output, modes, pvfb->numModes, 0))
        return FALSE;
     if (!RROutputSetCrtcs (output, &crtc, 1))
        return FALSE;
     if (!RROutputSetConnection (output, RR_Connected))
        return FALSE;
-    RRCrtcNotify (crtc, mode, 0, 0, RR_Rotate_0, NULL, 1, &output);
+    RRCrtcNotify (crtc, *modes, 0, 0, RR_Rotate_0, NULL, 1, &output);
 #endif
     return TRUE;
 }
