@@ -115,6 +115,8 @@ output_handle_mode(void *data, struct wl_output *wl_output, uint32_t flags,
         xwl_output->width = width;
         xwl_output->height = height;
     }
+    xwl_output->physical_width = width;
+    xwl_output->physical_height = height;
     xwl_output->refresh = refresh;
 }
 
@@ -339,7 +341,7 @@ output_get_rr_modes(struct xwl_output *xwl_output,
     RRModePtr *rr_modes;
     int i;
 
-    rr_modes = xallocarray(ARRAY_SIZE(xwl_output_fake_modes) + 1, sizeof(RRModePtr));
+    rr_modes = xallocarray(ARRAY_SIZE(xwl_output_fake_modes) + 2, sizeof(RRModePtr));
     if (!rr_modes)
         goto err;
 
@@ -373,6 +375,14 @@ output_get_rr_modes(struct xwl_output *xwl_output,
 
         (*count)++;
     }
+
+    rr_modes[*count] = xwayland_cvt(xwl_output->physical_width,
+                                    xwl_output->physical_height,
+                                    xwl_output->refresh / 1000.0, 0, 0);
+    if (!rr_modes[*count])
+      goto err;
+
+    (*count)++;
 
     return rr_modes;
 err:
