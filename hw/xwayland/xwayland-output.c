@@ -95,8 +95,8 @@ output_handle_geometry(void *data, struct wl_output *wl_output, int x, int y,
 
     /* Apply the change from wl_output only if xdg-output is not supported */
     if (!xwl_output->xdg_output) {
-        xwl_output->x = x;
-        xwl_output->y = y;
+        xwl_output->logical_x = x;
+        xwl_output->logical_y = y;
     }
     xwl_output->rotation = wl_transform_to_xrandr(transform);
 }
@@ -110,11 +110,18 @@ output_handle_mode(void *data, struct wl_output *wl_output, uint32_t flags,
     if (!(flags & WL_OUTPUT_MODE_CURRENT))
         return;
 
-    /* Apply the change from wl_output only if xdg-output is not supported */
     if (!xwl_output->xdg_output) {
-        xwl_output->width = width;
-        xwl_output->height = height;
+        if (xwl_output->rotation & (RR_Rotate_0 | RR_Rotate_180)) {
+            xwl_output->logical_width = width;
+            xwl_output->logical_height = height;
+        } else {
+            xwl_output->logical_width = height;
+            xwl_output->logical_height = width;
+        }
     }
+
+    xwl_output->mode_width = width;
+    xwl_output->mode_height = height;
     xwl_output->refresh = refresh;
 }
 
@@ -124,25 +131,13 @@ output_handle_mode(void *data, struct wl_output *wl_output, uint32_t flags,
  * function sets the provided values to these maxima on return.
  */
 static inline void
-output_get_new_size(struct xwl_output *xwl_output, int *width, int *height)
+output_get_new_logical_size(struct xwl_output *xwl_output, int *width, int *height)
 {
-    int output_width, output_height;
+    if (*width < xwl_output->logical_x + xwl_output->logical_width)
+        *width = xwl_output->logical_x + xwl_output->logical_width;
 
-    /* When we have xdg-output support the stored size is already rotated. */
-    if (xwl_output->xdg_output
-            || (xwl_output->rotation & (RR_Rotate_0 | RR_Rotate_180))) {
-        output_width = xwl_output->width;
-        output_height = xwl_output->height;
-    } else {
-        output_width = xwl_output->height;
-        output_height = xwl_output->width;
-    }
-
-    if (*width < xwl_output->x + output_width)
-        *width = xwl_output->x + output_width;
-
-    if (*height < xwl_output->y + output_height)
-        *height = xwl_output->y + output_height;
+    if (*height < xwl_output->logical_y + xwl_output->logical_height)
+        *height = xwl_output->logical_y + xwl_output->logical_height;
 }
 
 static int
@@ -331,9 +326,7 @@ const int32_t xwl_output_fake_modes[][2] = {
  * When an app requests a mode-change, we fake it using WPviewport.
  */
 static RRModePtr *
-output_get_rr_modes(struct xwl_output *xwl_output,
-                    int32_t width, int32_t height,
-                    int *count)
+output_get_rr_modes(struct xwl_output *xwl_output, int *count)
 {
     struct xwl_screen *xwl_screen = xwl_output->xwl_screen;
     RRModePtr *rr_modes;
@@ -344,7 +337,8 @@ output_get_rr_modes(struct xwl_output *xwl_output,
         goto err;
 
     /* Add actual output mode */
-    rr_modes[0] = xwayland_cvt(width, height, xwl_output->refresh / 1000.0, 0, 0);
+    rr_modes[0] = xwayland_cvt(xwl_output->mode_width, xwl_output->mode_height,
+                               xwl_output->refresh / 1000.0, 0, 0);
     if (!rr_modes[0])
         goto err;
 
@@ -356,13 +350,13 @@ output_get_rr_modes(struct xwl_output *xwl_output,
     /* Add fake modes */
     for (i = 0; i < ARRAY_SIZE(xwl_output_fake_modes); i++) {
         /* Skip actual output mode, already added */
-        if (xwl_output_fake_modes[i][0] == width &&
-            xwl_output_fake_modes[i][1] == height)
+        if (xwl_output_fake_modes[i][0] == xwl_output->mode_width &&
+            xwl_output_fake_modes[i][1] == xwl_output->mode_height)
             continue;
 
         /* Skip modes which are too big, avoid downscaling */
-        if (xwl_output_fake_modes[i][0] > width ||
-            xwl_output_fake_modes[i][1] > height)
+        if (xwl_output_fake_modes[i][0] > xwl_output->mode_width ||
+            xwl_output_fake_modes[i][1] > xwl_output->mode_height)
             continue;
 
         rr_modes[*count] = xwayland_cvt(xwl_output_fake_modes[i][0],
@@ -421,8 +415,8 @@ xwl_output_randr_emu_prop(struct xwl_screen *xwl_screen, ClientPtr client,
         if (!emulated_mode)
             continue;
 
-        prop->rects[index][0] = xwl_output->x;
-        prop->rects[index][1] = xwl_output->y;
+        prop->rects[index][0] = xwl_output->logical_x;
+        prop->rects[index][1] = xwl_output->logical_y;
         prop->rects[index][2] = emulated_mode->width;
         prop->rects[index][3] = emulated_mode->height;
         index++;
@@ -592,29 +586,35 @@ apply_output_change(struct xwl_output *xwl_output)
     int mode_width, mode_height, count;
     int width = 0, height = 0, has_this_output = 0;
     RRModePtr *randr_modes;
+    RRTransformRec transform;
+    pixman_fixed_t sx, sy;
 
     /* Clear out the "done" received flags */
     xwl_output->wl_output_done = FALSE;
     xwl_output->xdg_output_done = FALSE;
 
-    /* When we have received an xdg-output for the mode size we might need to
-     * rotate back the stored logical size it provided.
-     */
-    if (xwl_output->xdg_output == NULL
-        || xwl_output->rotation & (RR_Rotate_0 | RR_Rotate_180)) {
-        mode_width = xwl_output->width;
-        mode_height = xwl_output->height;
+    if (xwl_output->rotation & (RR_Rotate_0 | RR_Rotate_180)) {
+        mode_width = xwl_output->mode_width;
+        mode_height = xwl_output->mode_height;
     } else {
-        mode_width = xwl_output->height;
-        mode_height = xwl_output->width;
+        mode_width = xwl_output->mode_height;
+        mode_height = xwl_output->mode_width;
     }
 
+    sx = pixman_int_to_fixed(xwl_output->logical_width) / mode_width;
+    sy = pixman_int_to_fixed(xwl_output->logical_height) / mode_height;
+
+    RRTransformInit(&transform);
+    pixman_transform_init_scale(&transform.transform, sx, sy);
+
     /* Build a fresh modes array using the current refresh rate */
-    randr_modes = output_get_rr_modes(xwl_output, mode_width, mode_height, &count);
+    randr_modes = output_get_rr_modes(xwl_output, &count);
     RROutputSetModes(xwl_output->randr_output, randr_modes, count, 1);
     RRCrtcNotify(xwl_output->randr_crtc, randr_modes[0],
-                 xwl_output->x, xwl_output->y,
-                 xwl_output->rotation, NULL, 1, &xwl_output->randr_output);
+                 xwl_output->logical_x, xwl_output->logical_y,
+                 xwl_output->rotation,
+                 &transform,
+                 1, &xwl_output->randr_output);
     /* RROutputSetModes takes ownership of the passed in modes, so we only
      * have to free the pointer array.
      */
@@ -628,14 +628,14 @@ apply_output_change(struct xwl_output *xwl_output)
         if (it == xwl_output)
             has_this_output = 1;
 
-        output_get_new_size(it, &width, &height);
+        output_get_new_logical_size(it, &width, &height);
     }
 
     if (!has_this_output) {
         xorg_list_append(&xwl_output->link, &xwl_screen->output_list);
 
         /* we did not check this output for new screen size, do it now */
-        output_get_new_size(xwl_output, &width, &height);
+        output_get_new_logical_size(xwl_output, &width, &height);
 
 	--xwl_screen->expecting_event;
     }
@@ -675,8 +675,8 @@ xdg_output_handle_logical_position(void *data, struct zxdg_output_v1 *xdg_output
 {
     struct xwl_output *xwl_output = data;
 
-    xwl_output->x = x;
-    xwl_output->y = y;
+    xwl_output->logical_x = x;
+    xwl_output->logical_y = y;
 }
 
 static void
@@ -685,8 +685,8 @@ xdg_output_handle_logical_size(void *data, struct zxdg_output_v1 *xdg_output,
 {
     struct xwl_output *xwl_output = data;
 
-    xwl_output->width = width;
-    xwl_output->height = height;
+    xwl_output->logical_width = width;
+    xwl_output->logical_height = height;
 }
 
 static void
@@ -751,6 +751,7 @@ xwl_output_create(struct xwl_screen *xwl_screen, uint32_t id)
         goto err;
     }
     RRCrtcSetRotations (xwl_output->randr_crtc, ALL_ROTATIONS);
+    RRCrtcSetTransformSupport(xwl_output->randr_crtc, TRUE);
 
     xwl_output->randr_output = RROutputCreate(xwl_screen->screen, name,
                                               strlen(name), xwl_output);
@@ -806,7 +807,7 @@ xwl_output_remove(struct xwl_output *xwl_output)
     xorg_list_del(&xwl_output->link);
 
     xorg_list_for_each_entry(it, &xwl_screen->output_list, link)
-        output_get_new_size(it, &width, &height);
+        output_get_new_logical_size(it, &width, &height);
     update_screen_size(xwl_output, width, height);
 
     RRCrtcDestroy(xwl_output->randr_crtc);

@@ -221,7 +221,7 @@ xwl_window_enable_viewport(struct xwl_window *xwl_window,
     if (!xwl_window_has_viewport_enabled(xwl_window)) {
         DebugF("XWAYLAND: enabling viewport %dx%d -> %dx%d\n",
                emulated_mode->width, emulated_mode->height,
-               xwl_output->width, xwl_output->height);
+               xwl_output->logical_width, xwl_output->logical_height);
         xwl_window->viewport = wp_viewporter_get_viewport(xwl_window->xwl_screen->viewporter,
                                                           xwl_window->surface);
     }
@@ -232,11 +232,11 @@ xwl_window_enable_viewport(struct xwl_window *xwl_window,
                            wl_fixed_from_int(emulated_mode->width),
                            wl_fixed_from_int(emulated_mode->height));
     wp_viewport_set_destination(xwl_window->viewport,
-                                xwl_output->width,
-                                xwl_output->height);
+                                xwl_output->logical_width,
+                                xwl_output->logical_height);
 
-    xwl_window->scale_x = (float)emulated_mode->width  / xwl_output->width;
-    xwl_window->scale_y = (float)emulated_mode->height / xwl_output->height;
+    xwl_window->scale_x = (float)emulated_mode->width  / xwl_output->logical_width;
+    xwl_window->scale_y = (float)emulated_mode->height / xwl_output->logical_height;
 }
 
 static Bool
@@ -297,8 +297,8 @@ xwl_window_should_enable_viewport(struct xwl_window *xwl_window,
         if (!emulated_mode)
             continue;
 
-        if (drawable->x == xwl_output->x &&
-            drawable->y == xwl_output->y &&
+        if (drawable->x == xwl_output->logical_x &&
+            drawable->y == xwl_output->logical_y &&
             drawable->width  == emulated_mode->width &&
             drawable->height == emulated_mode->height) {
 
