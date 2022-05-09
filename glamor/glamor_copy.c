@@ -30,6 +30,7 @@ struct copy_args {
     glamor_pixmap_fbo   *src;
     uint32_t            bitplane;
     int                 dx, dy;
+    EGLImageKHR         image;
 };
 
 static Bool
@@ -37,9 +38,13 @@ use_copyarea(PixmapPtr dst, GCPtr gc, glamor_program *prog, void *arg)
 {
     struct copy_args *args = arg;
     glamor_pixmap_fbo *src = args->src;
+    EGLImageKHR image = args->image;
 
     glamor_bind_texture(glamor_get_screen_private(dst->drawable.pScreen),
                         GL_TEXTURE0, src, TRUE);
+
+    if (image)
+        glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, image);
 
     glUniform2f(prog->fill_offset_uniform, args->dx, args->dy);
     glUniform2f(prog->fill_size_inv_uniform, 1.0f/src->width, 1.0f/src->height);
@@ -452,6 +457,7 @@ glamor_copy_fbo_fbo_draw(DrawablePtr src,
         args.dx = dx + src_off_x - src_box->x1;
         args.dy = dy + src_off_y - src_box->y1;
         args.src = glamor_pixmap_fbo_at(src_priv, src_box_index);
+        args.image = src_priv->image;
 
         if (!glamor_use_program(dst_pixmap, gc, prog, &args))
             goto bail_ctx;
