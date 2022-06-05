@@ -179,6 +179,10 @@ SOFTWARE.
 #define X_INCLUDE_NETDB_H
 #include <X11/Xos_r.h>
 
+#ifdef HAVE_LIBBSD
+#include <bsd/unistd.h> /* for getpeereid */
+#endif
+
 #include "dixstruct.h"
 #include "osdep.h"
 
