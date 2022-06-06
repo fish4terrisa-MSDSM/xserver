@@ -764,7 +764,8 @@ glamor_init(ScreenPtr screen, unsigned int flags)
         epoxy_has_gl_extension("GL_ARB_map_buffer_range") ||
         epoxy_has_gl_extension("GL_EXT_map_buffer_range");
     glamor_priv->has_buffer_storage =
-        epoxy_has_gl_extension("GL_ARB_buffer_storage");
+        epoxy_has_gl_extension("GL_ARB_buffer_storage") ||
+        epoxy_has_gl_extension("GL_EXT_buffer_storage");
     glamor_priv->has_mesa_tile_raster_order =
         epoxy_has_gl_extension("GL_MESA_tile_raster_order");
     glamor_priv->has_nv_texture_barrier =
@@ -782,7 +783,8 @@ glamor_init(ScreenPtr screen, unsigned int flags)
         epoxy_has_gl_extension("GL_ARB_blend_func_extended");
     glamor_priv->has_clear_texture =
         epoxy_gl_version() >= 44 ||
-        epoxy_has_gl_extension("GL_ARB_clear_texture");
+        epoxy_has_gl_extension("GL_ARB_clear_texture") ||
+        epoxy_has_gl_extension("GL_EXT_clear_texture");
 
     glamor_priv->can_copyplane = (gl_version >= 30);
 
