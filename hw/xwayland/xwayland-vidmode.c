@@ -300,7 +300,7 @@ xwlVidModeSetViewPort(ScreenPtr pScreen, int x, int y)
         return FALSE;
 
     /* Support only default viewport */
-    return (x == xwl_output->x && y == xwl_output->y);
+    return (x == xwl_output->logical_x && y == xwl_output->logical_y);
 }
 
 static Bool
@@ -312,8 +312,8 @@ xwlVidModeGetViewPort(ScreenPtr pScreen, int *x, int *y)
     if (!xwl_output)
         return FALSE;
 
-    *x = xwl_output->x;
-    *y = xwl_output->y;
+    *x = xwl_output->logical_x;
+    *y = xwl_output->logical_y;
 
     return TRUE;
 }
