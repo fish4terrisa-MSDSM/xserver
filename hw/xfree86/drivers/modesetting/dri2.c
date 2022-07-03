@@ -1073,8 +1073,10 @@ ms_dri2_screen_init(ScreenPtr screen)
     info.DestroyBuffer2 = ms_dri2_destroy_buffer2;
     info.CopyRegion2 = ms_dri2_copy_region2;
 
+#ifdef GLAMOR_FOR_XORG
     /* Ask Glamor to obtain the DRI driver name via EGL_MESA_query_driver. */
     driver_names[0] = glamor_egl_get_driver_name(screen);
+#endif
 
     if (driver_names[0]) {
         /* There is no VDPAU driver for Intel, fallback to the generic
