@@ -55,7 +55,8 @@ ms_dri3_pixmap_map_bo(msPixmapPrivPtr ppriv, struct gbm_bo *bo)
 
     bw = gbm_bo_get_width(bo);
     bh = gbm_bo_get_height(bo);
-    baddr = gbm_bo_map(bo, 0, 0, bw, bh, 0, &bstride, &ppriv->bo_map);
+    baddr = gbm_bo_map(bo, 0, 0, bw, bh, GBM_BO_TRANSFER_READ_WRITE,
+                       &bstride, &ppriv->bo_map);
     if (baddr == MAP_FAILED) {
        xf86DrvMsg(-1, X_ERROR, "Failed to map bo: %s\n", strerror(errno));
        ppriv->bo = NULL;
