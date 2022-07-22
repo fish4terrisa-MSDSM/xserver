@@ -32,6 +32,7 @@
 
 #include <fcntl.h>
 #include <errno.h>
+#include <dlfcn.h>
 #include <sys/stat.h>
 #include <xf86drm.h>
 #include <drm_fourcc.h>
@@ -113,6 +114,33 @@ is_device_path_render_node (const char *device_path)
     return is_render_node;
 }
 
+static int (*real_gbm_bo_get_fd_for_plane)(struct gbm_bo *, int);
+
+static void
+init_gbm_abi(void)
+{
+    if (!real_gbm_bo_get_fd_for_plane) {
+        real_gbm_bo_get_fd_for_plane = dlsym(RTLD_NEXT,
+                                             "gbm_bo_get_fd_for_plane");
+        if (!real_gbm_bo_get_fd_for_plane)
+            LogMessageVerb(X_WARNING, 0,
+                "gbm_bo_get_fd_for_plane is not supported natively.\n");
+    }
+}
+
+static int
+xwl_gbm_bo_get_fd_for_plane(struct gbm_bo *bo, int plane)
+{
+    if (real_gbm_bo_get_fd_for_plane)
+        return real_gbm_bo_get_fd_for_plane(bo, plane);
+
+    if (plane == 0)
+        return gbm_bo_get_fd(bo);
+
+    errno = ENOSYS;
+    return -1;
+}
+
 static PixmapPtr
 xwl_glamor_gbm_create_pixmap_for_bo(ScreenPtr screen, struct gbm_bo *bo,
                                     int depth)
@@ -120,7 +148,6 @@ xwl_glamor_gbm_create_pixmap_for_bo(ScreenPtr screen, struct gbm_bo *bo,
     PixmapPtr pixmap;
     struct xwl_pixmap *xwl_pixmap;
     struct xwl_screen *xwl_screen = xwl_screen_get(screen);
-#ifdef GBM_BO_FD_FOR_PLANE
     struct xwl_gbm_private *xwl_gbm = xwl_gbm_get(xwl_screen);
     uint64_t modifier = gbm_bo_get_modifier(bo);
     const int num_planes = gbm_bo_get_plane_count(bo);
@@ -168,7 +195,6 @@ xwl_glamor_gbm_create_pixmap_for_bo(ScreenPtr screen, struct gbm_bo *bo,
     };
 
     for (plane = 0; plane < num_planes; plane++) fds[plane] = -1;
-#endif
 
     xwl_pixmap = calloc(1, sizeof(*xwl_pixmap));
     if (xwl_pixmap == NULL)
@@ -188,7 +214,6 @@ xwl_glamor_gbm_create_pixmap_for_bo(ScreenPtr screen, struct gbm_bo *bo,
     xwl_pixmap->bo = bo;
     xwl_pixmap->buffer = NULL;
 
-#ifdef GBM_BO_FD_FOR_PLANE
     if (xwl_gbm->dmabuf_capable) {
 #define ADD_ATTR(attrs, num, attr)                                      \
         do {                                                            \
@@ -203,7 +228,7 @@ xwl_glamor_gbm_create_pixmap_for_bo(ScreenPtr screen, struct gbm_bo *bo,
         ADD_ATTR(img_attrs, attr_num, gbm_bo_get_format(bo));
 
         for (plane = 0; plane < num_planes; plane++) {
-            fds[plane] = gbm_bo_get_fd_for_plane(bo, plane);
+            fds[plane] = xwl_gbm_bo_get_fd_for_plane(bo, plane);
             ADD_ATTR(img_attrs, attr_num, planeAttrs[plane][PLANE_FD]);
             ADD_ATTR(img_attrs, attr_num, fds[plane]);
             ADD_ATTR(img_attrs, attr_num, planeAttrs[plane][PLANE_OFFSET]);
@@ -230,7 +255,6 @@ xwl_glamor_gbm_create_pixmap_for_bo(ScreenPtr screen, struct gbm_bo *bo,
         }
     }
     else
-#endif
     {
         xwl_pixmap->image = eglCreateImageKHR(xwl_screen->egl_display,
                                               xwl_screen->egl_context,
@@ -1061,6 +1085,8 @@ xwl_glamor_init_gbm(struct xwl_screen *xwl_screen)
         ErrorF("glamor: Not enough memory to setup GBM, disabling\n");
         return;
     }
+
+    init_gbm_abi();
 
     dixSetPrivate(&xwl_screen->screen->devPrivates, &xwl_gbm_private_key,
                   xwl_gbm);
