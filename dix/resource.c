@@ -600,18 +600,6 @@ CreateNewResourceClass(void)
 
 static ClientResourceRec clientTable[MAXCLIENTS];
 
-static unsigned int
-ilog2(int val)
-{
-    int bits;
-
-    if (val <= 0)
-	return 0;
-    for (bits = 0; val != 0; bits++)
-	val >>= 1;
-    return bits - 1;
-}
-
 /*****************
  * ResourceClientBits
  *    Returns the client bit offset in the client + resources ID field
@@ -620,12 +608,17 @@ ilog2(int val)
 unsigned int
 ResourceClientBits(void)
 {
-    static unsigned int cached = 0;
+    int val = LimitClients;
+    unsigned int bits;
 
-    if (cached == 0)
-      cached = ilog2(LimitClients);
-
-    return cached;
+    if (val <= 0)
+        return 0;
+    // LimitClients cannot be less than 64
+    bits = 7;
+    val >>= 7;
+    for (; val != 0; bits++)
+        val >>= 1;
+    return bits - 1;
 }
 
 /*****************
@@ -663,7 +656,7 @@ InitClientResources(ClientPtr client)
      */
     clientTable[i].fakeID = client->clientAsMask |
         (client->index ? SERVER_BIT : SERVER_MINID);
-    clientTable[i].endFakeID = (clientTable[i].fakeID | RESOURCE_ID_MASK) + 1;
+    clientTable[i].endFakeID = (clientTable[i].fakeID | ResourceIdMask) + 1;
     for (j = 0; j < INITBUCKETS; j++) {
         clientTable[i].resources[j] = NULL;
     }
@@ -676,7 +669,7 @@ HashResourceID(XID id, unsigned int numBits)
     static XID mask;
 
     if (!mask)
-        mask = RESOURCE_ID_MASK;
+        mask = ResourceIdMask;
     id &= mask;
     if (numBits < 9)
         return (id ^ (id >> numBits) ^ (id >> (numBits<<1))) & ~((~0U) << numBits);
@@ -709,10 +702,10 @@ GetXIDRange(int client, Bool server, XID *minp, XID *maxp)
     int i;
     XID goodid;
 
-    id = (Mask) client << CLIENTOFFSET;
+    id = (Mask) client << ClientOffset;
     if (server)
         id |= client ? SERVER_BIT : SERVER_MINID;
-    maxid = id | RESOURCE_ID_MASK;
+    maxid = id | ResourceIdMask;
     goodid = 0;
     for (resp = clientTable[client].resources, i = clientTable[client].buckets;
          --i >= 0;) {
@@ -757,7 +750,7 @@ GetXIDList(ClientPtr pClient, unsigned count, XID *pids)
     XID maxid;
     void *val;
 
-    maxid = id | RESOURCE_ID_MASK;
+    maxid = id | ResourceIdMask;
     while ((found < count) && (id <= maxid)) {
         rc = dixLookupResourceByClass(&val, id, RC_ANY, serverClient,
                                       DixGetAttrAccess);
@@ -790,8 +783,8 @@ FakeClientID(int client)
         if (!client)
             FatalError("FakeClientID: server internal ids exhausted\n");
         MarkClientException(clients[client]);
-        id = ((Mask) client << CLIENTOFFSET) | (SERVER_BIT * 3);
-        maxid = id | RESOURCE_ID_MASK;
+        id = ((Mask) client << ClientOffset) | (SERVER_BIT * 3);
+        maxid = id | ResourceIdMask;
     }
     clientTable[client].fakeID = id + 1;
     clientTable[client].endFakeID = maxid + 1;
@@ -1179,12 +1172,12 @@ LegalNewID(XID id, ClientPtr client)
     if (!noPanoramiXExtension) {
         minid = client->clientAsMask | (client->index ?
                                         SERVER_BIT : SERVER_MINID);
-        maxid = (clientTable[client->index].fakeID | RESOURCE_ID_MASK) + 1;
+        maxid = (clientTable[client->index].fakeID | ResourceIdMask) + 1;
         if ((id >= minid) && (id <= maxid))
             return TRUE;
     }
 #endif                          /* PANORAMIX */
-    if (client->clientAsMask == (id & ~RESOURCE_ID_MASK)) {
+    if (client->clientAsMask == (id & ~ResourceIdMask)) {
         rc = dixLookupResourceByClass(&val, id, RC_ANY, serverClient,
                                       DixGetAttrAccess);
         return rc == BadValue;

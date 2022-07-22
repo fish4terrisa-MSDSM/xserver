@@ -254,7 +254,7 @@ unsigned
 ht_resourceid_hash(void * cdata, const void * data, int numBits)
 {
     const XID* idPtr = data;
-    XID id = *idPtr & RESOURCE_ID_MASK;
+    XID id = *idPtr & ResourceIdMask;
     (void) cdata;
     return HashResourceID(id, numBits);
 }

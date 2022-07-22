@@ -3583,7 +3583,7 @@ InitClient(ClientPtr client, int i, void *ospriv)
     client->index = i;
     xorg_list_init(&client->ready);
     xorg_list_init(&client->output_pending);
-    client->clientAsMask = ((Mask) i) << CLIENTOFFSET;
+    client->clientAsMask = ((Mask) i) << ClientOffset;
     client->closeDownMode = i ? DestroyAll : RetainPermanent;
     client->requestVector = InitialVector;
     client->osPrivate = ospriv;
@@ -3715,7 +3715,7 @@ SendConnSetup(ClientPtr client, const char *reason)
     client->requestVector = client->swapped ? SwappedProcVector : ProcVector;
     client->sequence = 0;
     ((xConnSetup *) lConnectionInfo)->ridBase = client->clientAsMask;
-    ((xConnSetup *) lConnectionInfo)->ridMask = RESOURCE_ID_MASK;
+    ((xConnSetup *) lConnectionInfo)->ridMask = ResourceIdMask;
 #ifdef MATCH_CLIENT_ENDIAN
     ((xConnSetup *) lConnectionInfo)->imageByteOrder = ClientOrder(client);
     ((xConnSetup *) lConnectionInfo)->bitmapBitOrder = ClientOrder(client);

@@ -87,6 +87,9 @@ int limitNoFile = -1;
 
 /* The actual user defined max number of clients */
 int LimitClients = LIMITCLIENTS;
+unsigned int ClientOffset = (29 - 8);
+unsigned int ResourceClientMask = (((1 << 8) - 1) << (29 - 8)/*ClientOffset*/);
+unsigned int ResourceIdMask = ((1 << (29 - 8)/*ClientOffset*/) - 1);
 
 static OsSigWrapperPtr OsSigWrapper = NULL;
 

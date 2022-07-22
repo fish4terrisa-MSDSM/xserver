@@ -959,10 +959,14 @@ configServerFlags(XF86ConfFlagsPtr flagsconf, XF86OptionPtr layoutopts)
         } else {
             from = X_CONFIG;
             LimitClients = i;
+            const int resource_client_bits = ResourceClientBits();
+            ClientOffset = (RESOURCE_AND_CLIENT_COUNT - resource_client_bits);
+            ResourceClientMask = (((1 << resource_client_bits) - 1) << ClientOffset);
+            ResourceIdMask = ((1 << ClientOffset) - 1);
         }
     }
     xf86Msg(from, "Max clients allowed: %i, resource mask: 0x%x\n",
-	    LimitClients, RESOURCE_ID_MASK);
+	    LimitClients, ResourceIdMask);
 }
 
 Bool

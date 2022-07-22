@@ -860,6 +860,10 @@ ProcessCommandLine(int argc, char *argv[])
 	{
 	    if (++i < argc) {
 		LimitClients = atoi(argv[i]);
+		const int resource_client_bits = ResourceClientBits();
+		ClientOffset = (RESOURCE_AND_CLIENT_COUNT - resource_client_bits);
+		ResourceClientMask = (((1 << resource_client_bits) - 1) << ClientOffset);
+		ResourceIdMask = ((1 << ClientOffset) - 1);
 		if (LimitClients != 64 &&
 		    LimitClients != 128 &&
 		    LimitClients != 256 &&

@@ -251,7 +251,7 @@ ProcXResQueryClients(ClientPtr client)
 
         for (i = 0; i < num_clients; i++) {
             scratch.resource_base = clients[current_clients[i]]->clientAsMask;
-            scratch.resource_mask = RESOURCE_ID_MASK;
+            scratch.resource_mask = ResourceIdMask;
 
             if (client->swapped) {
                 swapl(&scratch.resource_base);

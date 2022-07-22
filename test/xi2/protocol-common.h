@@ -58,7 +58,7 @@
 /* default client index */
 #define CLIENT_INDEX            1
 /* default client mask for resources and windows */
-#define CLIENT_MASK             ((CLIENT_INDEX) << CLIENTOFFSET)
+#define CLIENT_MASK             ((CLIENT_INDEX) << ClientOffset)
 /* default client sequence number for replies */
 #define CLIENT_SEQUENCE         0x100
 /* default root window id */
