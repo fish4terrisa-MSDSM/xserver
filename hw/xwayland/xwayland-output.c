@@ -354,7 +354,7 @@ output_get_rr_modes(struct xwl_output *xwl_output,
         goto err;
 
     /* Add actual output mode */
-    rr_modes[0] = xwayland_cvt(width, height, xwl_output->refresh / 1000.0, 1, 0);
+    rr_modes[0] = xwayland_cvt(width, height, xwl_output->refresh / 1000.0);
     if (!rr_modes[0])
         goto err;
 
@@ -377,7 +377,7 @@ output_get_rr_modes(struct xwl_output *xwl_output,
 
         rr_modes[*count] = xwayland_cvt(xwl_output_fake_modes[i][0],
                                         xwl_output_fake_modes[i][1],
-                                        xwl_output->refresh / 1000.0, 1, 0);
+                                        xwl_output->refresh / 1000.0);
         if (!rr_modes[*count])
             goto err;
 
@@ -1050,7 +1050,7 @@ xwl_randr_add_modes_fixed(struct xwl_output *xwl_output,
 
         mode = xwayland_cvt(xwl_output_fake_modes[i][0],
                             xwl_output_fake_modes[i][1],
-                            60, 0, 0);
+                            60);
 
         if (mode)
             modes[nmodes++] = mode;

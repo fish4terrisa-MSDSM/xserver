@@ -30,24 +30,28 @@
 #include "xwayland-cvt.h"
 
 RRModePtr
-xwayland_cvt(int hdisplay, int vdisplay, float vrefresh, Bool reduced,
-             Bool interlaced)
+xwayland_cvt(int hdisplay, int vdisplay, float vrefresh)
 {
     struct libxcvt_mode_info *libxcvt_mode_info;
     char name[128];
     xRRModeInfo modeinfo;
     enum libxcvt_rb_mode rb_mode;
+    enum libxcvt_cvt_status status;
 
-    if (reduced)
-        rb_mode = LIBXCVT_REDUCE_BLANKING_V2;
-    else
+    status = libxcvt_cvt_status(hdisplay, vdisplay, vrefresh,
+                                LIBXCVT_REDUCE_BLANKING_OFF);
+
+    if (status == LIBXCVT_CVT_STATUS_IS_STANDARD)
         rb_mode = LIBXCVT_REDUCE_BLANKING_OFF;
+    else
+        rb_mode = LIBXCVT_REDUCE_BLANKING_V2;
+
 
     libxcvt_mode_info = libxcvt_gen_mode_info_rbv3(hdisplay,
                                                    vdisplay,
                                                    vrefresh,
                                                    rb_mode,
-                                                   interlaced);
+                                                   false);
 
     memset(&modeinfo, 0, sizeof modeinfo);
     modeinfo.width      = libxcvt_mode_info->hdisplay;
