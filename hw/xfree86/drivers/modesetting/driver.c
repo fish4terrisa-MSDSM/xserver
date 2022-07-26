@@ -1706,7 +1706,7 @@ msSharePixmapBacking(PixmapPtr ppix, ScreenPtr secondary, void **handle)
 #if defined(GLAMOR_HAS_GBM) || defined(MS_DRI3)
     modesettingPtr ms =
         modesettingPTR(xf86ScreenToScrn(ppix->drawable.pScreen));
-    int ret;
+    int ret = -1;
     CARD16 stride;
     CARD32 size;
 
@@ -1735,7 +1735,7 @@ msSetSharedPixmapBacking(PixmapPtr ppix, void *fd_handle)
     ScreenPtr screen = ppix->drawable.pScreen;
     ScrnInfoPtr scrn = xf86ScreenToScrn(screen);
     modesettingPtr ms = modesettingPTR(scrn);
-    Bool ret;
+    Bool ret = FALSE;
     int ihandle = (int) (long) fd_handle;
 
     if (ihandle == -1)
