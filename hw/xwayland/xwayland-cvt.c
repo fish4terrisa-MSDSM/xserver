@@ -36,9 +36,18 @@ xwayland_cvt(int hdisplay, int vdisplay, float vrefresh, Bool reduced,
     struct libxcvt_mode_info *libxcvt_mode_info;
     char name[128];
     xRRModeInfo modeinfo;
+    enum libxcvt_rb_mode rb_mode;
 
-    libxcvt_mode_info =
-        libxcvt_gen_mode_info(hdisplay, vdisplay, vrefresh, reduced, interlaced);
+    if (reduced)
+        rb_mode = LIBXCVT_REDUCE_BLANKING_V2;
+    else
+        rb_mode = LIBXCVT_REDUCE_BLANKING_OFF;
+
+    libxcvt_mode_info = libxcvt_gen_mode_info_rbv3(hdisplay,
+                                                   vdisplay,
+                                                   vrefresh,
+                                                   rb_mode,
+                                                   interlaced);
 
     memset(&modeinfo, 0, sizeof modeinfo);
     modeinfo.width      = libxcvt_mode_info->hdisplay;
