@@ -209,6 +209,9 @@ xwl_close_screen(ScreenPtr screen)
                                   &xwl_screen->pending_wl_surface_destroy, link)
         xwl_window_surface_do_destroy(xwl_wl_surface);
 
+    if (xwl_screen->main_device)
+        free(xwl_screen->main_device);
+
     RemoveNotifyFd(xwl_screen->wayland_fd);
 
     wl_display_disconnect(xwl_screen->display);

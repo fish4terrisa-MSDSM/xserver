@@ -117,6 +117,7 @@ struct xwl_screen {
     int prepare_read;
     int wait_flush;
 
+    char *main_device;
     uint32_t num_formats;
     struct xwl_format *formats;
     void *egl_display, *egl_context;

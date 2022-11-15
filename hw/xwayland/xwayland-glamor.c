@@ -37,6 +37,8 @@
 
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include "drm-client-protocol.h"
+#include <sys/mman.h>
+#include <xf86drm.h>
 #include <drm_fourcc.h>
 
 #include "xwayland-glamor.h"
@@ -263,16 +265,147 @@ static const struct zwp_linux_dmabuf_v1_listener xwl_dmabuf_listener = {
     .modifier = xwl_dmabuf_handle_modifier
 };
 
+struct xwl_dmabuf_feedback_state {
+    struct zwp_linux_dmabuf_feedback_v1 *feedback;
+    struct xwl_screen *screen;
+
+    const void *format_table;
+    uint32_t format_table_size;
+};
+
+static void
+xwl_dmabuf_feedback_format_table(void *data,
+                                 struct zwp_linux_dmabuf_feedback_v1 *feedback,
+                                 int32_t fd, uint32_t size)
+{
+    struct xwl_dmabuf_feedback_state *state = data;
+    void *ptr;
+
+    ptr = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (ptr != MAP_FAILED) {
+        state->format_table = ptr;
+        state->format_table_size = size;
+    }
+
+    close(fd);
+}
+
+static void
+xwl_dmabuf_feedback_main_device(void *data,
+                                struct zwp_linux_dmabuf_feedback_v1 *feedback,
+                                struct wl_array *device)
+{
+    struct xwl_dmabuf_feedback_state *state = data;
+    struct xwl_screen *xwl_screen = state->screen;
+    dev_t dev;
+    drmDevicePtr dev_ptr;
+
+    memcpy(&dev, device->data, sizeof(dev));
+    if (drmGetDeviceFromDevId(dev, 0, &dev_ptr) < 0)
+        return;
+
+    if (dev_ptr->available_nodes & (1 << DRM_NODE_RENDER))
+        xwl_screen->main_device = strdup(dev_ptr->nodes[DRM_NODE_RENDER]);
+
+    drmFreeDevice(&dev_ptr);
+}
+
+static void
+xwl_dmabuf_feedback_tranche_target_device(void *data,
+                                          struct zwp_linux_dmabuf_feedback_v1 *feedback,
+                                          struct wl_array *device)
+{
+}
+
+static void
+xwl_dmabuf_feedback_tranche_flags(void *data,
+                                  struct zwp_linux_dmabuf_feedback_v1 *feedback,
+                                  uint32_t flags)
+{
+}
+
+static void
+xwl_dmabuf_feedback_tranche_formats(void *data,
+                                    struct zwp_linux_dmabuf_feedback_v1 *feedback,
+                                    struct wl_array *indices)
+{
+    struct xwl_dmabuf_feedback_state *state = data;
+    struct xwl_screen *xwl_screen = state->screen;
+    uint16_t *index;
+
+    if (!state->format_table)
+        return;
+
+    wl_array_for_each(index, indices) {
+        /* every entry is 16 bytes */
+        const uint32_t *format = (const uint32_t *)state->format_table + *index * 4;
+        const uint64_t *modifier = (const uint64_t *)format + 1;
+
+        xwl_glamor_add_modifier(xwl_screen, *format, *modifier);
+    }
+}
+
+static void
+xwl_dmabuf_feedback_tranche_done(void *data,
+                                 struct zwp_linux_dmabuf_feedback_v1 *feedback)
+{
+}
+
+static void
+xwl_dmabuf_feedback_done(void *data,
+                         struct zwp_linux_dmabuf_feedback_v1 *feedback)
+{
+    struct xwl_dmabuf_feedback_state *state = data;
+    struct xwl_screen *xwl_screen = state->screen;
+
+    if (state->format_table)
+        munmap((void *) state->format_table, state->format_table_size);
+
+    zwp_linux_dmabuf_feedback_v1_destroy(state->feedback);
+
+    free(state);
+
+    xwl_screen->expecting_event--;
+}
+
+static const struct zwp_linux_dmabuf_feedback_v1_listener xwl_dmabuf_feedback_listener = {
+    .format_table = xwl_dmabuf_feedback_format_table,
+    .main_device = xwl_dmabuf_feedback_main_device,
+    .tranche_target_device = xwl_dmabuf_feedback_tranche_target_device,
+    .tranche_flags = xwl_dmabuf_feedback_tranche_flags,
+    .tranche_formats = xwl_dmabuf_feedback_tranche_formats,
+    .tranche_done = xwl_dmabuf_feedback_tranche_done,
+    .done = xwl_dmabuf_feedback_done,
+};
+
 Bool
 xwl_screen_set_dmabuf_interface(struct xwl_screen *xwl_screen,
                                 uint32_t id, uint32_t version)
 {
+    struct xwl_dmabuf_feedback_state *state = NULL;
+
     if (version < 3)
         return FALSE;
 
+    if (version >= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
+        state = calloc(1, sizeof(*state));
+        version = state ?
+            ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION : 3;
+    }
+
     xwl_screen->dmabuf =
-        wl_registry_bind(xwl_screen->registry, id, &zwp_linux_dmabuf_v1_interface, 3);
+        wl_registry_bind(xwl_screen->registry, id, &zwp_linux_dmabuf_v1_interface, version);
     zwp_linux_dmabuf_v1_add_listener(xwl_screen->dmabuf, &xwl_dmabuf_listener, xwl_screen);
+
+    if (state) {
+        state->screen = xwl_screen;
+        state->feedback =
+            zwp_linux_dmabuf_v1_get_default_feedback(xwl_screen->dmabuf);
+        zwp_linux_dmabuf_feedback_v1_add_listener(state->feedback,
+                                                  &xwl_dmabuf_feedback_listener,
+                                                  state);
+	xwl_screen->expecting_event++;
+    }
 
     return TRUE;
 }
