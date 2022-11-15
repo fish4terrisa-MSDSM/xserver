@@ -433,7 +433,7 @@ xwl_glamor_gbm_get_wl_buffer_for_pixmap(PixmapPtr pixmap)
            zwp_linux_buffer_params_v1_create_immed(params, width, height,
                                                    format, 0);
         zwp_linux_buffer_params_v1_destroy(params);
-    } else if (num_planes == 1) {
+    } else if (xwl_gbm->drm && num_planes == 1) {
         xwl_pixmap->buffer =
             wl_drm_create_prime_buffer(xwl_gbm->drm, prime_fds[0], width, height,
                                        format,
@@ -530,11 +530,13 @@ xwl_dri3_open_client(ClientPtr client,
 {
     struct xwl_screen *xwl_screen = xwl_screen_get(screen);
     struct xwl_gbm_private *xwl_gbm = xwl_gbm_get(xwl_screen);
+    const char *device_name = xwl_gbm->device_name ?
+        xwl_gbm->device_name : xwl_screen->main_device;
     struct xwl_auth_state *state;
     drm_magic_t magic;
     int fd;
 
-    fd = open(xwl_gbm->device_name, O_RDWR | O_CLOEXEC);
+    fd = open(device_name, O_RDWR | O_CLOEXEC);
     if (fd < 0)
         return BadAlloc;
     if (xwl_gbm->fd_render_node) {
@@ -889,8 +891,9 @@ xwl_glamor_gbm_has_wl_interfaces(struct xwl_screen *xwl_screen)
 {
     struct xwl_gbm_private *xwl_gbm = xwl_gbm_get(xwl_screen);
 
-    if (xwl_gbm->drm == NULL) {
-        LogMessageVerb(X_INFO, 3, "glamor: 'wl_drm' not supported\n");
+    if (xwl_gbm->drm == NULL && xwl_screen->main_device == NULL) {
+        LogMessageVerb(X_INFO, 3,
+                       "glamor: 'wl_drm' or 'zwp_linux_dmabuf_v1' not supported\n");
         return FALSE;
     }
 
@@ -995,6 +998,17 @@ xwl_glamor_gbm_init_egl(struct xwl_screen *xwl_screen)
     EGLint major, minor;
     const GLubyte *renderer;
     const char *gbm_backend_name;
+
+    if (xwl_gbm->drm_fd < 0 && xwl_screen->main_device) {
+       xwl_gbm->drm_fd = open(xwl_screen->main_device, O_RDWR | O_CLOEXEC);
+       if (xwl_gbm->drm_fd == -1) {
+           ErrorF("wayland-egl: could not open %s (%s)\n",
+                  xwl_screen->main_device, strerror(errno));
+           goto error;
+       }
+
+       xwl_gbm->fd_render_node = 1;
+    }
 
     if (!xwl_gbm->fd_render_node && !xwl_gbm->drm_authenticated) {
         ErrorF("Failed to get wl_drm, disabling Glamor and DRI3\n");
@@ -1116,6 +1130,7 @@ xwl_glamor_init_gbm(struct xwl_screen *xwl_screen)
         ErrorF("glamor: Not enough memory to setup GBM, disabling\n");
         return;
     }
+    xwl_gbm->drm_fd = -1;
 
     dixSetPrivate(&xwl_screen->screen->devPrivates, &xwl_gbm_private_key,
                   xwl_gbm);
