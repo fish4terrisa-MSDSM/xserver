@@ -213,11 +213,9 @@ xwl_dmabuf_handle_format(void *data, struct zwp_linux_dmabuf_v1 *dmabuf,
 }
 
 static void
-xwl_dmabuf_handle_modifier(void *data, struct zwp_linux_dmabuf_v1 *dmabuf,
-                           uint32_t format, uint32_t modifier_hi,
-                           uint32_t modifier_lo)
+xwl_glamor_add_modifier(struct xwl_screen *xwl_screen,
+	                uint32_t format, uint64_t modifier)
 {
-    struct xwl_screen *xwl_screen = data;
     struct xwl_format *xwl_format = NULL;
     int i;
 
@@ -245,8 +243,19 @@ xwl_dmabuf_handle_modifier(void *data, struct zwp_linux_dmabuf_v1 *dmabuf,
                                     xwl_format->num_modifiers * sizeof(uint64_t));
     if (!xwl_format->modifiers)
         return;
-    xwl_format->modifiers[xwl_format->num_modifiers - 1]  = (uint64_t) modifier_lo;
-    xwl_format->modifiers[xwl_format->num_modifiers - 1] |= (uint64_t) modifier_hi << 32;
+    xwl_format->modifiers[xwl_format->num_modifiers - 1] = modifier;
+}
+
+static void
+xwl_dmabuf_handle_modifier(void *data, struct zwp_linux_dmabuf_v1 *dmabuf,
+                           uint32_t format, uint32_t modifier_hi,
+                           uint32_t modifier_lo)
+{
+    struct xwl_screen *xwl_screen = data;
+    const uint64_t modifier =
+        (uint64_t) modifier_lo | ((uint64_t) modifier_hi << 32);
+
+    xwl_glamor_add_modifier(xwl_screen, format, modifier);
 }
 
 static const struct zwp_linux_dmabuf_v1_listener xwl_dmabuf_listener = {
