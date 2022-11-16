@@ -430,6 +430,7 @@ message_filter(DBusConnection * connection, DBusMessage * message, void *data)
         info->active = TRUE;
 
         if (pdev) {
+	    close(fd);
             pdev->flags &= ~XF86_PDEV_PAUSED;
         } else
             systemd_logind_set_input_fd_for_all_devs(major, minor, fd,
