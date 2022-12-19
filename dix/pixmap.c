@@ -41,6 +41,7 @@ from The Open Group.
 #include "gcstruct.h"
 #include "servermd.h"
 #include "X11/extensions/render.h"
+#include "pixmapstr.h"
 #include "picturestr.h"
 #include "randrstr.h"
 /*
@@ -180,17 +181,34 @@ PixmapDirtyDamageDestroy(DamagePtr damage, void *closure)
     dirty->damage = NULL;
 }
 
-Bool
-PixmapStartDirtyTracking(DrawablePtr src,
-                         PixmapPtr secondary_dst,
-                         int x, int y, int dst_x, int dst_y,
-                         Rotation rotation)
+static Bool
+IsSimpleTransform (PictTransform transform)
+{
+    /* A simple transform here means non-rotated and non-scaled. Translation
+     * is still simple as it's just moving around and can easily be broken
+     * apart to adjust the offsets. Thus, check that the transform is an
+     * identity transform but simply disregard the constant terms. */
+    transform.matrix[0][2] = pixman_int_to_fixed(0);
+    transform.matrix[1][2] = pixman_int_to_fixed(0);
+
+    return pixman_transform_is_identity(&transform);
+}
+
+static Bool
+PixmapStartDirtyTrackingHelper(DrawablePtr src,
+                               PixmapPtr secondary_dst,
+                               int x, int y, int dst_x, int dst_y,
+                               RRTransformPtr rr_transform,
+                               Rotation rotation)
 {
     ScreenPtr screen = src->pScreen;
     PixmapDirtyUpdatePtr dirty_update;
     RegionPtr damageregion;
     RegionRec dstregion;
     BoxRec box;
+
+    if (rr_transform && pixman_transform_is_identity(&rr_transform->transform))
+        rr_transform = NULL;
 
     dirty_update = calloc(1, sizeof(PixmapDirtyUpdateRec));
     if (!dirty_update)
@@ -207,16 +225,24 @@ PixmapStartDirtyTracking(DrawablePtr src,
                                         DamageReportNone, TRUE, screen,
                                         dirty_update);
 
-    if (rotation != RR_Rotate_0) {
-        RRTransformCompute(x, y,
-                           secondary_dst->drawable.width,
-                           secondary_dst->drawable.height,
-                           rotation,
-                           NULL,
-                           &dirty_update->transform,
-                           &dirty_update->f_transform,
-                           &dirty_update->f_inverse);
+    /* Compute complex transforms if rotation or a custom transform applies.
+     * Otherwise initialize transforms to a simple translation. */
+    if (rotation != RR_Rotate_0 || rr_transform) {
+        Bool is_complex = RRTransformCompute(x, y,
+                                             secondary_dst->drawable.width,
+                                             secondary_dst->drawable.height,
+                                             rotation,
+                                             rr_transform,
+                                             &dirty_update->transform,
+                                             &dirty_update->f_transform,
+                                             &dirty_update->f_inverse);
+        assert(IsSimpleTransform(dirty_update->transform) == !is_complex);
+    } else {
+        pixman_transform_init_translate(&dirty_update->transform, IntToxFixed(x), IntToxFixed(y));
+        pixman_f_transform_init_translate(&dirty_update->f_transform, x, y);
+        pixman_f_transform_init_translate(&dirty_update->f_inverse, -x, -y);
     }
+
     if (!dirty_update->damage) {
         free(dirty_update);
         return FALSE;
@@ -243,6 +269,30 @@ PixmapStartDirtyTracking(DrawablePtr src,
     DamageRegister(src, dirty_update->damage);
     xorg_list_add(&dirty_update->ent, &screen->pixmap_dirty_list);
     return TRUE;
+}
+
+Bool
+PixmapStartDirtyTracking(DrawablePtr src,
+                         PixmapPtr secondary_dst,
+                         int x, int y, int dst_x, int dst_y,
+                         Rotation rotation)
+{
+    return PixmapStartDirtyTrackingHelper(src, secondary_dst,
+                                          x, y, dst_x, dst_y,
+                                          NULL, rotation);
+}
+
+Bool
+PixmapStartDirtyTrackingWithCrtc(DrawablePtr src,
+                                 PixmapPtr secondary_dst,
+                                 int x, int y, int dst_x, int dst_y,
+                                 RRCrtcPtr crtc,
+                                 Rotation rotation)
+{
+    return PixmapStartDirtyTrackingHelper(src, secondary_dst,
+                                          x, y, dst_x, dst_y,
+                                          &crtc->client_pending_transform,
+                                          rotation);
 }
 
 Bool
@@ -336,10 +386,6 @@ PixmapDirtyCompositeRotate(PixmapPtr dst_pixmap,
         BoxRec dst_box;
 
         dst_box = *b;
-        dst_box.x1 += dirty->x;
-        dst_box.x2 += dirty->x;
-        dst_box.y1 += dirty->y;
-        dst_box.y2 += dirty->y;
         pixman_f_transform_bounds(&dirty->f_inverse, &dst_box);
 
         CompositePicture(PictOpSrc,
@@ -386,6 +432,10 @@ Bool PixmapSyncDirtyHelper(PixmapDirtyUpdatePtr dirty)
         box.x2 = dst->drawable.width;
         box.y2 = dst->drawable.height;
     }
+
+    /* Bring box to the same coordinate space as the damage region (i.e. the
+     * master framebuffer). */
+    pixman_f_transform_bounds(&dirty->f_transform, &box);
     RegionInit(&pixregion, &box, 1);
 
     /*
@@ -397,7 +447,6 @@ Bool PixmapSyncDirtyHelper(PixmapDirtyUpdatePtr dirty)
     SourceValidate = pScreen->SourceValidate;
     pScreen->SourceValidate = miSourceValidate;
 
-    RegionTranslate(&pixregion, dirty->x, dirty->y);
     RegionIntersect(&pixregion, &pixregion, region);
 
     if (RegionNil(&pixregion)) {
@@ -405,12 +454,18 @@ Bool PixmapSyncDirtyHelper(PixmapDirtyUpdatePtr dirty)
         return FALSE;
     }
 
-    RegionTranslate(&pixregion, -dirty->x, -dirty->y);
-
-    if (!pScreen->root || dirty->rotation == RR_Rotate_0)
+    if ((!pScreen->root || dirty->rotation == RR_Rotate_0) &&
+        IsSimpleTransform(dirty->transform)) {
+        /* For plain area copy shift pixregion to the right position manually. */
+        RegionTranslate(&pixregion,
+                        -xFixedToInt(dirty->transform.matrix[0][2]),
+                        -xFixedToInt(dirty->transform.matrix[1][2]));
         PixmapDirtyCopyArea(dst, dirty, &pixregion);
-    else
+    } else {
+        /* No translation needed, CompositeRotate will use the transform matrix
+         * implicitly in rendering. */
         PixmapDirtyCompositeRotate(dst, dirty, &pixregion);
+    }
     pScreen->SourceValidate = SourceValidate;
     return TRUE;
 }

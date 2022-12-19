@@ -1831,8 +1831,8 @@ drmmode_set_target_scanout_pixmap_gpu(xf86CrtcPtr crtc, PixmapPtr ppix,
         screen->height = screenpix->drawable.height = max_height;
     }
     drmmode_crtc->prime_pixmap_x = this_x;
-    PixmapStartDirtyTracking(&ppix->drawable, screenpix, 0, 0, this_x, 0,
-                             RR_Rotate_0);
+    PixmapStartDirtyTrackingWithCrtc(&ppix->drawable, screenpix, 0, 0, this_x, 0,
+                                     crtc->randr_crtc, RR_Rotate_0);
     *target = ppix;
     return TRUE;
 }

@@ -1503,13 +1503,15 @@ msStartFlippingPixmapTracking(RRCrtcPtr crtc, DrawablePtr src,
     msPixmapPrivPtr ppriv1 = msGetPixmapPriv(&ms->drmmode, secondary_dst1->primary_pixmap),
                     ppriv2 = msGetPixmapPriv(&ms->drmmode, secondary_dst2->primary_pixmap);
 
-    if (!PixmapStartDirtyTracking(src, secondary_dst1, x, y,
-                                  dst_x, dst_y, rotation)) {
+    if (!PixmapStartDirtyTrackingWithCrtc(src, secondary_dst1, x, y,
+                                          dst_x, dst_y,
+                                          crtc, rotation)) {
         return FALSE;
     }
 
-    if (!PixmapStartDirtyTracking(src, secondary_dst2, x, y,
-                                  dst_x, dst_y, rotation)) {
+    if (!PixmapStartDirtyTrackingWithCrtc(src, secondary_dst2, x, y,
+                                          dst_x, dst_y,
+                                          crtc, rotation)) {
         PixmapStopDirtyTracking(src, secondary_dst1);
         return FALSE;
     }
