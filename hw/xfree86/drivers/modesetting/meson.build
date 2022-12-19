@@ -1,4 +1,6 @@
 modesetting_srcs = [
+    'dri3_sync.c',
+    'dri3.c',
     'dri2.c',
     'driver.c',
     'drmmode_display.c',
@@ -20,6 +22,7 @@ shared_module(
         udev_dep,
         libdrm_dep,
         gbm_dep,
+        epoxy_dep,
     ],
 
     install: true,
