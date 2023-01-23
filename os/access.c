@@ -179,6 +179,10 @@ SOFTWARE.
 #define X_INCLUDE_NETDB_H
 #include <X11/Xos_r.h>
 
+#ifdef HAVE_LIBBSD
+#include <bsd/unistd.h> /* for getpeereid */
+#endif
+
 #include "dixstruct.h"
 #include "osdep.h"
 
@@ -1167,15 +1171,15 @@ GetLocalClientCreds(ClientPtr client, LocalClientCredRec ** lccp)
     XtransConnInfo ci;
     LocalClientCredRec *lcc;
 
-#ifdef HAVE_GETPEEREID
-    uid_t uid;
-    gid_t gid;
-#elif defined(HAVE_GETPEERUCRED)
+#if defined(HAVE_GETPEERUCRED)
     ucred_t *peercred = NULL;
     const gid_t *gids;
 #elif defined(SO_PEERCRED)
     struct ucred peercred;
     socklen_t so_len = sizeof(peercred);
+#elif defined(HAVE_GETPEEREID)
+    uid_t uid;
+    gid_t gid;
 #endif
 
     if (client == NULL)
@@ -1197,16 +1201,7 @@ GetLocalClientCreds(ClientPtr client, LocalClientCredRec ** lccp)
     lcc = *lccp;
 
     fd = _XSERVTransGetConnectionNumber(ci);
-#ifdef HAVE_GETPEEREID
-    if (getpeereid(fd, &uid, &gid) == -1) {
-        FreeLocalClientCreds(lcc);
-        return -1;
-    }
-    lcc->euid = uid;
-    lcc->egid = gid;
-    lcc->fieldsSet = LCC_UID_SET | LCC_GID_SET;
-    return 0;
-#elif defined(HAVE_GETPEERUCRED)
+#if defined(HAVE_GETPEERUCRED)
     if (getpeerucred(fd, &peercred) < 0) {
         FreeLocalClientCreds(lcc);
         return -1;
@@ -1253,6 +1248,15 @@ GetLocalClientCreds(ClientPtr client, LocalClientCredRec ** lccp)
     lcc->egid = peercred.gid;
     lcc->pid = peercred.pid;
     lcc->fieldsSet = LCC_UID_SET | LCC_GID_SET | LCC_PID_SET;
+    return 0;
+#elif defined(HAVE_GETPEEREID)
+    if (getpeereid(fd, &uid, &gid) == -1) {
+        FreeLocalClientCreds(lcc);
+        return -1;
+    }
+    lcc->euid = uid;
+    lcc->egid = gid;
+    lcc->fieldsSet = LCC_UID_SET | LCC_GID_SET;
     return 0;
 #endif
 #else
