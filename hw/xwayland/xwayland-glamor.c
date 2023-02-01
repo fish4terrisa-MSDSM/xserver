@@ -187,14 +187,29 @@ wl_drm_format_for_depth(int depth)
     }
 }
 
-static dev_t
+dev_t
 xwl_screen_get_main_dev(struct xwl_screen *xwl_screen)
 {
     /*
-     * If we have gbm then get our main device from it. Otherwise use what
-     * the compositor told us.
+     * There's a couple different scenarios we have to handle to get the
+     * correct device that was used as the "main" device for this client:
+     *
+     * 1. For dmabuf v4, we stash the default_feedback.main_dev in the screen,
+     *    so grab it from there and return it. This is the device being treated
+     *    as the main device for Xwayland's lifetime
+     * 2. For dmabuf v3 and if we are using GBM, get the device GBM used (the device
+     *    handed to us from the wl_drm protocol)
+     * 3. For all other cases (eglstream backend) just return the main device
+     *    the compositor gave us.
      */
-    if (xwl_screen->gbm_backend.is_available)
+    if (xwl_screen->dmabuf_protocol_version >= 4) {
+        if (!xwl_screen->main_dev_is_set) {
+            xwl_screen->main_dev_is_set = true;
+            xwl_screen->main_dev = xwl_screen->default_feedback.main_dev;
+        }
+
+        return xwl_screen->main_dev;
+    } else if (xwl_screen->gbm_backend.is_available)
         return xwl_screen->gbm_backend.get_main_device(xwl_screen);
     else
         return xwl_screen->default_feedback.main_dev;

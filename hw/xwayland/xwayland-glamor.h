@@ -116,6 +116,7 @@ Bool xwl_screen_set_drm_interface(struct xwl_screen *xwl_screen,
 Bool xwl_dmabuf_setup_feedback_for_window(struct xwl_window *xwl_window);
 Bool xwl_screen_set_dmabuf_interface(struct xwl_screen *xwl_screen,
                                      uint32_t id, uint32_t version);
+dev_t xwl_screen_get_main_dev(struct xwl_screen *xwl_screen);
 struct wl_buffer *xwl_glamor_pixmap_get_wl_buffer(PixmapPtr pixmap);
 void xwl_glamor_init_wl_registry(struct xwl_screen *xwl_screen,
                                  struct wl_registry *registry,
