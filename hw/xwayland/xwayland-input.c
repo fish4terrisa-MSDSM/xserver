@@ -507,8 +507,8 @@ pointer_handle_enter(void *data, struct wl_pointer *pointer,
     DeviceIntPtr dev = get_pointer_device(xwl_seat);
     DeviceIntPtr master;
     int i;
-    int sx = wl_fixed_to_int(sx_w);
-    int sy = wl_fixed_to_int(sy_w);
+    int sx = wl_fixed_to_int(sx_w) * xwl_seat->xwl_screen->global_output_scale;
+    int sy = wl_fixed_to_int(sy_w) * xwl_seat->xwl_screen->global_output_scale;
     int dx, dy;
     ScreenPtr pScreen = xwl_seat->xwl_screen->screen;
     ValuatorMask mask;
@@ -731,13 +731,14 @@ pointer_handle_motion(void *data, struct wl_pointer *pointer,
                       uint32_t time, wl_fixed_t sx_w, wl_fixed_t sy_w)
 {
     struct xwl_seat *xwl_seat = data;
+    int32_t scale = xwl_seat->xwl_screen->global_output_scale;
 
     if (!xwl_seat->focus_window)
         return;
 
     xwl_seat->pending_pointer_event.has_absolute = TRUE;
-    xwl_seat->pending_pointer_event.x = sx_w;
-    xwl_seat->pending_pointer_event.y = sy_w;
+    xwl_seat->pending_pointer_event.x = sx_w * scale;
+    xwl_seat->pending_pointer_event.y = sy_w * scale;
 
     if (wl_proxy_get_version((struct wl_proxy *) xwl_seat->wl_pointer) < 5)
         dispatch_pointer_motion_event(xwl_seat);
@@ -887,12 +888,13 @@ relative_pointer_handle_relative_motion(void *data,
                                         wl_fixed_t dy_unaccelf)
 {
     struct xwl_seat *xwl_seat = data;
+    int32_t scale = xwl_seat->xwl_screen->global_output_scale;
 
     xwl_seat->pending_pointer_event.has_relative = TRUE;
-    xwl_seat->pending_pointer_event.dx = wl_fixed_to_double(dxf);
-    xwl_seat->pending_pointer_event.dy = wl_fixed_to_double(dyf);
-    xwl_seat->pending_pointer_event.dx_unaccel = wl_fixed_to_double(dx_unaccelf);
-    xwl_seat->pending_pointer_event.dy_unaccel = wl_fixed_to_double(dy_unaccelf);
+    xwl_seat->pending_pointer_event.dx = wl_fixed_to_double(dxf) * scale;
+    xwl_seat->pending_pointer_event.dy = wl_fixed_to_double(dyf) * scale;
+    xwl_seat->pending_pointer_event.dx_unaccel = wl_fixed_to_double(dx_unaccelf) * scale;
+    xwl_seat->pending_pointer_event.dy_unaccel = wl_fixed_to_double(dy_unaccelf) * scale;
 
     if (!xwl_seat->focus_window)
         return;
@@ -1382,8 +1384,8 @@ touch_handle_down(void *data, struct wl_touch *wl_touch,
 
     xwl_touch->window = wl_surface_get_user_data(surface);
     xwl_touch->id = id;
-    xwl_touch->x = wl_fixed_to_int(sx_w);
-    xwl_touch->y = wl_fixed_to_int(sy_w);
+    xwl_touch->x = wl_fixed_to_int(sx_w) * xwl_seat->xwl_screen->global_output_scale;
+    xwl_touch->y = wl_fixed_to_int(sy_w) * xwl_seat->xwl_screen->global_output_scale;
     xorg_list_add(&xwl_touch->link_touch, &xwl_seat->touches);
 
     xwl_touch_send_event(xwl_touch, xwl_seat, XI_TouchBegin);
@@ -1419,8 +1421,8 @@ touch_handle_motion(void *data, struct wl_touch *wl_touch,
     if (!xwl_touch)
         return;
 
-    xwl_touch->x = wl_fixed_to_int(sx_w);
-    xwl_touch->y = wl_fixed_to_int(sy_w);
+    xwl_touch->x = wl_fixed_to_int(sx_w) * xwl_seat->xwl_screen->global_output_scale;;
+    xwl_touch->y = wl_fixed_to_int(sy_w) * xwl_seat->xwl_screen->global_output_scale;;
     xwl_touch_send_event(xwl_touch, xwl_seat, XI_TouchUpdate);
 }
 
@@ -2110,8 +2112,8 @@ tablet_tool_motion(void *data, struct zwp_tablet_tool_v2 *tool,
     struct xwl_tablet_tool *xwl_tablet_tool = data;
     struct xwl_seat *xwl_seat = xwl_tablet_tool->seat;
     int32_t dx, dy;
-    double sx = wl_fixed_to_double(x);
-    double sy = wl_fixed_to_double(y);
+    double sx = wl_fixed_to_double(x) * xwl_seat->xwl_screen->global_output_scale;
+    double sy = wl_fixed_to_double(y) * xwl_seat->xwl_screen->global_output_scale;
 
     if (!xwl_seat->tablet_focus_window)
         return;
@@ -3152,6 +3154,7 @@ xwl_pointer_warp_emulator_set_fake_pos(struct xwl_pointer_warp_emulator *warp_em
                                        int x,
                                        int y)
 {
+    struct xwl_screen *xwl_screen;
     struct zwp_locked_pointer_v1 *locked_pointer =
         warp_emulator->locked_pointer;
     WindowPtr window;
@@ -3163,6 +3166,7 @@ xwl_pointer_warp_emulator_set_fake_pos(struct xwl_pointer_warp_emulator *warp_em
     if (!warp_emulator->xwl_seat->focus_window)
         return;
 
+    xwl_screen = warp_emulator->xwl_seat->xwl_screen;
     window = warp_emulator->xwl_seat->focus_window->window;
     if (x >= window->drawable.x ||
         y >= window->drawable.y ||
@@ -3171,8 +3175,8 @@ xwl_pointer_warp_emulator_set_fake_pos(struct xwl_pointer_warp_emulator *warp_em
         sx = x - window->drawable.x;
         sy = y - window->drawable.y;
         zwp_locked_pointer_v1_set_cursor_position_hint(locked_pointer,
-                                                       wl_fixed_from_int(sx),
-                                                       wl_fixed_from_int(sy));
+                                                       wl_fixed_from_int(xwl_scale_to(xwl_screen, sx)),
+                                                       wl_fixed_from_int(xwl_scale_to(xwl_screen, sy)));
         wl_surface_commit(warp_emulator->xwl_seat->focus_window->surface);
     }
 }

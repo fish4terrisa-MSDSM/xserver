@@ -788,7 +788,8 @@ xwl_create_root_surface(struct xwl_window *xwl_window)
     }
 
     wl_region_add(region, 0, 0,
-                  window->drawable.width, window->drawable.height);
+                  xwl_scale_to(xwl_screen, window->drawable.width),
+                  xwl_scale_to(xwl_screen, window->drawable.height));
     wl_surface_set_opaque_region(xwl_window->surface, region);
     wl_region_destroy(region);
 
@@ -1330,6 +1331,7 @@ xwl_window_post_damage(struct xwl_window *xwl_window)
 #endif
 
     wl_surface_attach(xwl_window->surface, buffer, 0, 0);
+    wl_surface_set_buffer_scale(xwl_window->surface, xwl_screen->global_output_scale);
 
     /* Arbitrary limit to try to avoid flooding the Wayland
      * connection. If we flood it too much anyway, this could
