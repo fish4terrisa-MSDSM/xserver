@@ -554,6 +554,23 @@ proc_dri3_buffers_from_pixmap(ClientPtr client)
     return Success;
 }
 
+static int
+proc_dri3_set_drm_device_in_use(ClientPtr client)
+{
+    REQUEST(xDRI3SetDRMDeviceInUseReq);
+    WindowPtr window;
+    int status;
+
+    REQUEST_SIZE_MATCH(xDRI3SetDRMDeviceInUseReq);
+
+    status = dixLookupWindow(&window, stuff->window, client,
+                             DixGetAttrAccess);
+    if (status != Success)
+        return status;
+
+    return dri3_set_drm_device_in_use(window, stuff->drmMajor, stuff->drmMinor);
+}
+
 int (*proc_dri3_vector[DRI3NumberRequests]) (ClientPtr) = {
     proc_dri3_query_version,            /* 0 */
     proc_dri3_open,                     /* 1 */
@@ -564,6 +581,7 @@ int (*proc_dri3_vector[DRI3NumberRequests]) (ClientPtr) = {
     proc_dri3_get_supported_modifiers,  /* 6 */
     proc_dri3_pixmap_from_buffers,      /* 7 */
     proc_dri3_buffers_from_pixmap,      /* 8 */
+    proc_dri3_set_drm_device_in_use,    /* 9 */
 };
 
 int

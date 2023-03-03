@@ -933,6 +933,7 @@ static const dri3_screen_info_rec xwl_dri3_info = {
     .get_formats = xwl_glamor_get_formats,
     .get_modifiers = xwl_glamor_get_modifiers,
     .get_drawable_modifiers = xwl_glamor_get_drawable_modifiers,
+    .set_drm_device_in_use = xwl_set_drm_device_in_use,
 };
 
 static Bool

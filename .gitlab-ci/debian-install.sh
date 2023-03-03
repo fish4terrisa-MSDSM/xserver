@@ -158,6 +158,20 @@ cd piglit
 git checkout 265896c86f90cb72e8f218ba6a3617fca8b9a1e3
 cd ..
 
+git clone https://gitlab.freedesktop.org/xorg/proto/xcbproto --depth=1 --branch=xcb-proto-1.15.1
+pushd xcbproto
+./autogen.sh
+make -j${FDO_CI_CONCURRENT:-4} install
+popd
+rm -rf xcbproto
+
+git clone https://gitlab.freedesktop.org/xorg/lib/libxcb --depth=1 --branch=libxcb-1.15
+pushd libxcb
+./autogen.sh
+make -j${FDO_CI_CONCURRENT:-4} install
+popd
+rm -rf libxcb
+
 git clone https://gitlab.freedesktop.org/xorg/test/xts
 cd xts
 git checkout dbbfa96c036e596346147081cbceda136e7c86c1

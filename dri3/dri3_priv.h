@@ -102,4 +102,9 @@ dri3_get_supported_modifiers(ScreenPtr screen, DrawablePtr drawable,
                              CARD32 *num_screen_modifiers,
                              CARD64 **screen_modifiers);
 
+int
+dri3_set_drm_device_in_use(WindowPtr window,
+                           CARD32 drmMajor,
+                           CARD32 drmMinor);
+
 #endif /* _DRI3PRIV_H_ */

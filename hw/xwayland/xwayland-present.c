@@ -56,7 +56,7 @@ xwl_present_window_priv(WindowPtr window)
                          &xwl_present_window_private_key);
 }
 
-static struct xwl_present_window *
+struct xwl_present_window *
 xwl_present_window_get_priv(WindowPtr window)
 {
     struct xwl_present_window *xwl_present_window = xwl_present_window_priv(window);

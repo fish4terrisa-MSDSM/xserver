@@ -43,8 +43,16 @@
 #include "xwayland-glx.h"
 #include "xwayland-screen.h"
 #include "xwayland-window.h"
+#include "xwayland-present.h"
 
 #include <sys/mman.h>
+
+#include <xf86drm.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#if defined(__linux__)
+#include <sys/sysmacros.h>
+#endif
 
 static void
 glamor_egl_make_current(struct glamor_context *glamor_ctx)
@@ -368,6 +376,7 @@ xwl_glamor_get_drawable_modifiers(DrawablePtr drawable, uint32_t format,
 {
     struct xwl_screen *xwl_screen = xwl_screen_get(drawable->pScreen);
     struct xwl_window *xwl_window;
+    struct xwl_present_window *xwl_present_window;
     dev_t main_dev;
 
     *num_modifiers = 0;
@@ -381,16 +390,37 @@ xwl_glamor_get_drawable_modifiers(DrawablePtr drawable, uint32_t format,
         return FALSE;
 
     xwl_window = xwl_window_from_window((WindowPtr)drawable);
+    xwl_present_window = xwl_present_window_get_priv((WindowPtr)drawable);
 
     /* couldn't find drawable for window */
-    if (!xwl_window)
+    if (!xwl_window || !xwl_present_window)
         return FALSE;
 
-    main_dev = xwl_screen_get_main_dev(xwl_screen);
+    /*
+     * If we have a drm device specified by the client, query the mods for
+     * that device. Otherwise get the modifiers for the default device for
+     * this window.
+     */
+    if (xwl_present_window->drm_dev_in_use_set) {
+        return xwl_get_modifiers_for_device(&xwl_window->feedback, xwl_present_window->drm_dev_in_use,
+                                            format, num_modifiers, modifiers);
+    } else {
+        main_dev = xwl_screen_get_main_dev(xwl_screen);
 
-    return xwl_get_modifiers_for_device(&xwl_window->feedback, main_dev,
-                                        format, num_modifiers, modifiers);
+        return xwl_get_modifiers_for_device(&xwl_window->feedback, main_dev,
+                                            format, num_modifiers, modifiers);
+    }
+}
 
+Bool
+xwl_set_drm_device_in_use(WindowPtr window, uint32_t drmMajor, uint32_t drmMinor)
+{
+    struct xwl_present_window *xwl_present_window = xwl_present_window_get_priv(window);
+
+    xwl_present_window->drm_dev_in_use = makedev(drmMajor, drmMinor);
+    xwl_present_window->drm_dev_in_use_set = 1;
+
+    return TRUE;
 }
 
 static void
