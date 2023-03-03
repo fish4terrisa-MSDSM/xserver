@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <X11/X.h>
 #include <dix.h>
+#include <stdbool.h>
 
 #include "xwayland-types.h"
 #include "xwayland-window.h"
@@ -104,6 +105,9 @@ struct xwl_screen {
     struct zwp_linux_dmabuf_v1 *dmabuf;
     int dmabuf_protocol_version;
     struct xwl_dmabuf_feedback default_feedback;
+    /* The cached device that we will consider the primary device */
+    dev_t main_dev;
+    bool main_dev_is_set;
     struct zxdg_output_manager_v1 *xdg_output_manager;
     struct wp_viewporter *viewporter;
     struct xwayland_shell_v1 *xwayland_shell;

@@ -53,6 +53,7 @@
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 
 struct xwl_gbm_private {
+    /* These fields are set by the wl_drm protocol */
     dev_t device;
     char *device_name;
     struct gbm_device *gbm;
@@ -524,6 +525,27 @@ static const struct wl_callback_listener sync_listener = {
 };
 
 static int
+xwl_find_drm_node_by_devid(dev_t devid)
+{
+    drmDevicePtr drm_dev;
+    int fd = -1;
+
+    if (drmGetDeviceFromDevId(devid, 0, &drm_dev))
+        return -1;
+
+    if (drm_dev->available_nodes & (1 << DRM_NODE_RENDER)) {
+        fd = open(drm_dev->nodes[DRM_NODE_RENDER], O_RDWR | O_CLOEXEC);
+        if (fd < 0) {
+            ErrorF("Failed to open %s, disabling Glamor and DRI3: %s\n",
+                   drm_dev->nodes[DRM_NODE_RENDER], strerror(errno));
+        }
+    }
+
+    drmFreeDevice(&drm_dev);
+    return fd;
+}
+
+static int
 xwl_dri3_open_client(ClientPtr client,
                      ScreenPtr screen,
                      RRProviderPtr provider,
@@ -534,6 +556,17 @@ xwl_dri3_open_client(ClientPtr client,
     struct xwl_auth_state *state;
     drm_magic_t magic;
     int fd;
+
+    /* For v4 use the cached main device in our screen */
+    if (xwl_screen->dmabuf_protocol_version >= 4) {
+        dev_t main_dev = xwl_screen_get_main_dev(xwl_screen);
+        fd = xwl_find_drm_node_by_devid(main_dev);
+        if (fd < 0)
+            return BadAlloc;
+
+        *pfd = fd;
+        return Success;
+    }
 
     fd = open(xwl_gbm->device_name, O_RDWR | O_CLOEXEC);
     if (fd < 0)
