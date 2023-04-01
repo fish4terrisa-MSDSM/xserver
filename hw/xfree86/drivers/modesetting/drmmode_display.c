@@ -1104,6 +1104,14 @@ drmmode_bo_import(drmmode_ptr drmmode, drmmode_bo *bo,
                         drmmode_bo_get_handle(bo), fb_id);
 }
 
+/* Even if built against an older gbm.h, we might as well try to use
+ * the FRONT_RENDERING flag.  If at runtime we are using an older
+ * version of gbm, it will be ignored.
+ */
+#ifndef GBM_HAS_BO_USE_FRONT_RENDERING
+#  define GBM_BO_USE_FRONT_RENDERING (1 << 6)
+#endif
+
 static Bool
 drmmode_create_bo(drmmode_ptr drmmode, drmmode_bo *bo,
                   unsigned width, unsigned height, unsigned bpp)
@@ -1118,6 +1126,10 @@ drmmode_create_bo(drmmode_ptr drmmode, drmmode_bo *bo,
         uint64_t *modifiers = NULL;
 #endif
         uint32_t format;
+        uint32_t flags = GBM_BO_USE_RENDERING | GBM_BO_USE_SCANOUT;
+
+        if (bo == &drmmode->front_bo)
+            flags |= GBM_BO_USE_FRONT_RENDERING;
 
         switch (drmmode->scrn->depth) {
         case 15:
@@ -1137,6 +1149,14 @@ drmmode_create_bo(drmmode_ptr drmmode, drmmode_bo *bo,
 #ifdef GBM_BO_WITH_MODIFIERS
         num_modifiers = get_modifiers_set(drmmode->scrn, format, &modifiers,
                                           FALSE, TRUE);
+
+	/* We can't actually know which modifiers safe to use with front
+	 * buffer rendering, which is a bit of a gap in the whole generic
+	 * things pick modifiers plan.
+	 */
+	if (flags & GBM_BO_USE_FRONT_RENDERING)
+            num_modifiers = 0;
+
         if (num_modifiers > 0 &&
             !(num_modifiers == 1 && modifiers[0] == DRM_FORMAT_MOD_INVALID)) {
             bo->gbm = gbm_bo_create_with_modifiers(drmmode->gbm, width, height,
