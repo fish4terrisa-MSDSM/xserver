@@ -28,7 +28,6 @@
 #include <dix.h>
 #include <randrstr.h>
 
-RRModePtr xwayland_cvt(int HDisplay, int VDisplay,
-                       float VRefresh, Bool Reduced, Bool Interlaced);
+RRModePtr xwayland_cvt(int HDisplay, int VDisplay, float VRefresh);
 
 #endif /* XWAYLAND_CVT_H */
