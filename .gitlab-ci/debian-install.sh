@@ -5,12 +5,17 @@ set -o xtrace
 
 # Packages which are needed by this script, but not for the xserver build
 EPHEMERAL="
+	cmake
+	curl
+	glslang-tools
 	libcairo2-dev
 	libevdev-dev
 	libexpat-dev
 	libgles2-mesa-dev
 	libinput-dev
 	libxkbcommon-dev
+	libwaffle-dev
+	libvulkan-dev
 	x11-utils
 	x11-xserver-utils
 	xauth
@@ -57,6 +62,7 @@ apt-get install -y \
 	libtool \
 	libudev-dev \
 	libunwind-dev \
+	libwaffle-1-0 \
 	libwayland-dev \
 	libx11-dev \
 	libx11-xcb-dev \
@@ -115,6 +121,13 @@ apt-get install -y \
 
 cd /root
 
+# Install deqp-runner for GL testing
+curl \
+   -L --retry 4 -f --retry-all-errors --retry-delay 60 \
+   https://gitlab.freedesktop.org/api/v4/projects/7988/packages/generic/deqp-runner/0.16.3/deqp-runner_0.16.3_amd64.deb \
+   -o deqp-runner.deb
+dpkg -i deqp-runner.deb
+
 # Xwayland requires drm 2.4.109 for drmGetDeviceFromDevId
 git clone https://gitlab.freedesktop.org/mesa/drm --depth 1 --branch=libdrm-2.4.109
 cd drm
@@ -171,9 +184,15 @@ ninja -C _build -j${FDO_CI_CONCURRENT:-4} install
 cd ..
 rm -rf libei
 
+# Include most of a piglit checkout, which will have the python piglit framework
+# for XTS testing, plus build a few of piglit's GLX tests so we can regression
+# test that part of our code (not all of GL).
 git clone https://gitlab.freedesktop.org/mesa/piglit.git
 cd piglit
 git checkout 265896c86f90cb72e8f218ba6a3617fca8b9a1e3
+cmake -G Ninja .
+ninja -t targets | sed -rn 's/^(glx.*): .*/\1/p' | xargs ninja -j${FDO_CI_CONCURRENT:-4}
+ninja  -j${FDO_CI_CONCURRENT:-4} glinfo gen-gl-xml
 cd ..
 
 git clone https://gitlab.freedesktop.org/xorg/test/xts
@@ -193,6 +212,7 @@ ninja -j${FDO_CI_CONCURRENT:-4} -C build install
 cd ..
 
 rm -rf piglit/.git xts/.git piglit/tests/spec/ rendercheck/
+find piglit/ -name CMake* | xargs rm -rf
 
 echo '[xts]' > piglit/piglit.conf
 echo 'path=/root/xts' >> piglit/piglit.conf

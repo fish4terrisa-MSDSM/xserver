@@ -1,0 +1,41 @@
+# Probe color at (0,0)
+#   Expected: 255 0 0
+#   Observed: 0 0 0
+glx@glx-copy-sub-buffer,Fail
+glx@glx-copy-sub-buffer samples=2,Fail
+glx@glx-copy-sub-buffer samples=4,Fail
+
+# Probe color at (1,1)
+#   Expected: 0.840188 0.394383 0.783099
+#   Observed: 0.000000 0.000000 0.000000
+#   (test failed for window 0)
+glx@glx-make-current,Fail
+
+# All probes come back black.
+glx@glx-multi-window-single-context,Fail
+
+# Probed black.
+glx@glx-swap-copy,Fail
+
+# Reports piglit failure with no context.
+glx@glx-swap-pixmap-bad,Fail
+
+# X Error of failed request:  BadDrawable (invalid Pixmap or Window parameter)
+#   Major opcode of failed request:  130 (MIT-SHM)
+#   Minor opcode of failed request:  3 (X_ShmPutImage)
+glx@glx-visuals-depth,Crash
+glx@glx-visuals-depth -pixmap,Crash
+glx@glx-visuals-stencil,Crash
+glx@glx-visuals-stencil -pixmap,Crash
+
+# Created OpenGL context with invalid flag 0x00000004, but this should have failed.
+# X error 0 (non-GLX error (-1)) was generated, but X error 2 was expected.
+glx@glx_arb_create_context@invalid flag,Fail
+
+# X error 2 (non-GLX error (-1)) was generated, but GLXBadProfileARB (13) was expected.
+glx@glx_arb_create_context_es2_profile@invalid opengl es version,Fail
+
+# info: debug=yes, robustness=no
+# error: context creation failed
+# info: fail
+glx@glx_arb_create_context_no_error@no error,Fail

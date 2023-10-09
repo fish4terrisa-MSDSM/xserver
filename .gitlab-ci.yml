@@ -19,7 +19,7 @@ variables:
     FDO_UPSTREAM_REPO: xorg/xserver
     FDO_DISTRIBUTION_VERSION: bullseye-slim
     FDO_DISTRIBUTION_EXEC: 'env FDO_CI_CONCURRENT=${FDO_CI_CONCURRENT} bash .gitlab-ci/debian-install.sh'
-    FDO_DISTRIBUTION_TAG: "2023-06-20-libei.0"
+    FDO_DISTRIBUTION_TAG: "2023-10-09-glx-2"
 
 include:
   - project: 'freedesktop/ci-templates'
@@ -62,6 +62,7 @@ debian-bullseye:
         paths:
             - build/meson-logs/
             - build/test/piglit-results/
+            - build/test/*-piglit
     variables:
         CCACHE_COMPILERCHECK: content
         CCACHE_DIR: /cache/xserver/cache
