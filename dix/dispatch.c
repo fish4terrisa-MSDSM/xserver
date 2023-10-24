@@ -3890,6 +3890,12 @@ static int indexForScanlinePad[65] = {
     3                           /* 64 bits per scanline pad unit */
 };
 
+static Bool
+DefaultCloseScreen(ScreenPtr screen)
+{
+    return TRUE;
+}
+
 /*
 	grow the array of screenRecs if necessary.
 	call the device-supplied initialization procedure
@@ -3949,6 +3955,9 @@ static int init_screen(ScreenPtr pScreen, int i, Bool gpu)
             PixmapWidthPaddingInfo[depth].notPower2 = 0;
         }
     }
+
+    pScreen->CloseScreen = DefaultCloseScreen;
+
     return 0;
 }
 
