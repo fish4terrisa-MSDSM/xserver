@@ -75,12 +75,14 @@
 #define BLACK_VALUE 0x00
 #define OVERSCAN_VALUE 0x01
 
-/* Use a private definition of this here */
-#undef VGAHWPTR
-#define VGAHWPTRLVAL(p) (p)->privates[vgaHWPrivateIndex].ptr
-#define VGAHWPTR(p) ((vgaHWPtr)(VGAHWPTRLVAL(p)))
+static DevPrivateKeyRec vgaHWScreenPrivateKey;
 
-static int vgaHWPrivateIndex = -1;
+vgaHWPtr
+VGAHWPTR(ScrnInfoPtr pScrn)
+{
+    return dixLookupPrivate(&xf86ScrnToScreen(pScrn)->devPrivates,
+                            &vgaHWScreenPrivateKey);
+}
 
 #define DAC_TEST_MASK 0x3F
 
@@ -1475,9 +1477,8 @@ vgaHWVBlankKGA(DisplayModePtr mode, vgaRegPtr regp, int nBits,
 static void
 vgaHWGetHWRecPrivate(void)
 {
-    if (vgaHWPrivateIndex < 0)
-        vgaHWPrivateIndex = xf86AllocateScrnInfoPrivateIndex();
-    return;
+    if (!dixPrivateKeyRegistered(&vgaHWScreenPrivateKey))
+        dixRegisterPrivateKey(&vgaHWScreenPrivateKey, PRIVATE_SCREEN, 0);
 }
 
 static void
@@ -1629,7 +1630,10 @@ vgaHWGetHWRec(ScrnInfoPtr scrp)
      */
     if (VGAHWPTR(scrp))
         return TRUE;
-    hwp = VGAHWPTRLVAL(scrp) = xnfcalloc(sizeof(vgaHWRec), 1);
+    hwp = xnfcalloc(sizeof(vgaHWRec), 1);
+    dixSetPrivate(&xf86ScrnToScreen(scrp)->devPrivates,
+                  &vgaHWScreenPrivateKey, hwp);
+
     regp = &VGAHWPTR(scrp)->ModeReg;
 
     if ((!vgaHWAllocDefaultRegs(&VGAHWPTR(scrp)->SavedReg)) ||
@@ -1717,7 +1721,7 @@ vgaHWGetHWRec(ScrnInfoPtr scrp)
 void
 vgaHWFreeHWRec(ScrnInfoPtr scrp)
 {
-    if (vgaHWPrivateIndex >= 0) {
+    if (dixPrivateKeyRegistered(&vgaHWScreenPrivateKey)) {
         vgaHWPtr hwp = VGAHWPTR(scrp);
 
         if (!hwp)
@@ -1733,7 +1737,8 @@ vgaHWFreeHWRec(ScrnInfoPtr scrp)
         vgaHWFreeRegs(&hwp->SavedReg);
 
         free(hwp);
-        VGAHWPTRLVAL(scrp) = NULL;
+        dixSetPrivate(&xf86ScrnToScreen(scrp)->devPrivates,
+                      &vgaHWScreenPrivateKey, NULL);
     }
 }
 
@@ -1774,12 +1779,6 @@ vgaHWUnmapMem(ScrnInfoPtr scrp)
     DebugF("Unmapping VGAMem\n");
     pci_device_unmap_legacy(hwp->dev, hwp->Base, hwp->MapSize);
     hwp->Base = NULL;
-}
-
-int
-vgaHWGetIndex(void)
-{
-    return vgaHWPrivateIndex;
 }
 
 void

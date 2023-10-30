@@ -48,13 +48,7 @@ _X_EXPORT XF86ModuleData fbdevhwModuleData = {
 #include <stdlib.h>
 #include <unistd.h>
 
-/* -------------------------------------------------------------------- */
-/* our private data, and two functions to allocate/free this            */
-
-#define FBDEVHWPTRLVAL(p) (p)->privates[fbdevHWPrivateIndex].ptr
-#define FBDEVHWPTR(p) ((fbdevHWPtr)(FBDEVHWPTRLVAL(p)))
-
-static int fbdevHWPrivateIndex = -1;
+static DevPrivateKeyRec fbdevHWScreenPrivateKey;
 
 typedef struct {
     /* framebuffer device: filename (/dev/fb*), handle, more */
@@ -84,26 +78,36 @@ enum {
     FBIOBLANK_UNSUPPORTED = 0,
 };
 
+static fbdevHWPtr
+FBDEVHWPTR(ScrnInfoPtr pScrn)
+{
+    return dixLookupPrivate(&xf86ScrnToScreen(pScrn)->devPrivates,
+                            &fbdevHWScreenPrivateKey);
+}
+
 Bool
 fbdevHWGetRec(ScrnInfoPtr pScrn)
 {
-    if (fbdevHWPrivateIndex < 0)
-        fbdevHWPrivateIndex = xf86AllocateScrnInfoPrivateIndex();
+    ScreenPtr pScreen = xf86ScrnToScreen(pScrn);
 
-    if (FBDEVHWPTR(pScrn) != NULL)
+    if (!dixRegisterPrivateKey(&fbdevHWScreenPrivateKey, PRIVATE_SCREEN, 0))
+        return FALSE;
+
+    if (FBDEVHWPTR(pScrn))
         return TRUE;
 
-    FBDEVHWPTRLVAL(pScrn) = xnfcalloc(sizeof(fbdevHWRec), 1);
+    dixSetPrivate(&pScreen->devPrivates, &fbdevHWScreenPrivateKey,
+                  xnfcalloc(sizeof(fbdevHWRec), 1));
+
     return TRUE;
 }
 
 void
 fbdevHWFreeRec(ScrnInfoPtr pScrn)
 {
-    if (fbdevHWPrivateIndex < 0)
-        return;
     free(FBDEVHWPTR(pScrn));
-    FBDEVHWPTRLVAL(pScrn) = NULL;
+    dixSetPrivate(&xf86ScrnToScreen(pScrn)->devPrivates,
+                  &fbdevHWScreenPrivateKey, NULL);
 }
 
 int

@@ -64,14 +64,13 @@ struct glamor_egl_screen_private {
     xf86FreeScreenProc *saved_free_screen;
 };
 
-int xf86GlamorEGLPrivateIndex = -1;
-
+static DevPrivateKeyRec glamoregl_screen_private_key;
 
 static struct glamor_egl_screen_private *
 glamor_egl_get_screen_private(ScrnInfoPtr scrn)
 {
-    return (struct glamor_egl_screen_private *)
-        scrn->privates[xf86GlamorEGLPrivateIndex].ptr;
+    return dixLookupPrivate(&xf86ScrnToScreen(scrn)->devPrivates,
+                            &glamoregl_screen_private_key);
 }
 
 static void
@@ -961,13 +960,17 @@ glamor_egl_init(ScrnInfoPtr scrn, int fd)
     struct glamor_egl_screen_private *glamor_egl;
     const GLubyte *renderer;
 
+    if (!dixRegisterPrivateKey(&glamoregl_screen_private_key, PRIVATE_SCREEN, 0))
+        return FALSE;
+
     glamor_egl = calloc(sizeof(*glamor_egl), 1);
     if (glamor_egl == NULL)
         return FALSE;
-    if (xf86GlamorEGLPrivateIndex == -1)
-        xf86GlamorEGLPrivateIndex = xf86AllocateScrnInfoPrivateIndex();
 
-    scrn->privates[xf86GlamorEGLPrivateIndex].ptr = glamor_egl;
+    dixSetPrivate(&xf86ScrnToScreen(scrn)->devPrivates,
+                  &glamoregl_screen_private_key,
+                  glamor_egl);
+
     glamor_egl->fd = fd;
     glamor_egl->gbm = gbm_create_device(glamor_egl->fd);
     if (glamor_egl->gbm == NULL) {

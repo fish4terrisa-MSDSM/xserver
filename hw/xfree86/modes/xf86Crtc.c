@@ -50,21 +50,30 @@
  * Initialize xf86CrtcConfig structure
  */
 
-int xf86CrtcConfigPrivateIndex = -1;
+static DevPrivateKeyRec xf86crtc_screen_private_key;
+
+xf86CrtcConfigPtr
+XF86_CRTC_CONFIG_PTR(ScrnInfoPtr pScrn)
+{
+    return dixLookupPrivate(&xf86ScrnToScreen(pScrn)->devPrivates,
+                            &xf86crtc_screen_private_key);
+}
 
 void
 xf86CrtcConfigInit(ScrnInfoPtr scrn, const xf86CrtcConfigFuncsRec * funcs)
 {
     xf86CrtcConfigPtr config;
 
-    if (xf86CrtcConfigPrivateIndex == -1)
-        xf86CrtcConfigPrivateIndex = xf86AllocateScrnInfoPrivateIndex();
+    if (!dixRegisterPrivateKey(&xf86crtc_screen_private_key,
+                               PRIVATE_SCREEN, 0))
+        return;
+
     config = xnfcalloc(1, sizeof(xf86CrtcConfigRec));
 
     config->funcs = funcs;
     config->compat_output = -1;
-
-    scrn->privates[xf86CrtcConfigPrivateIndex].ptr = config;
+    dixSetPrivate(&xf86ScrnToScreen(scrn)->devPrivates,
+                  &xf86crtc_screen_private_key, config);
 }
 
 void
@@ -3467,7 +3476,7 @@ xf86_crtc_clip_video_helper(ScrnInfoPtr pScrn,
 xf86_crtc_notify_proc_ptr
 xf86_wrap_crtc_notify(ScreenPtr screen, xf86_crtc_notify_proc_ptr new)
 {
-    if (xf86CrtcConfigPrivateIndex != -1) {
+    if (dixPrivateKeyRegistered(&xf86crtc_screen_private_key)) {
         ScrnInfoPtr scrn = xf86ScreenToScrn(screen);
         xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(scrn);
         xf86_crtc_notify_proc_ptr old;
@@ -3482,7 +3491,7 @@ xf86_wrap_crtc_notify(ScreenPtr screen, xf86_crtc_notify_proc_ptr new)
 void
 xf86_unwrap_crtc_notify(ScreenPtr screen, xf86_crtc_notify_proc_ptr old)
 {
-    if (xf86CrtcConfigPrivateIndex != -1) {
+    if (dixPrivateKeyRegistered(&xf86crtc_screen_private_key)) {
         ScrnInfoPtr scrn = xf86ScreenToScrn(screen);
         xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(scrn);
 
@@ -3503,7 +3512,7 @@ xf86_crtc_notify(ScreenPtr screen)
 Bool
 xf86_crtc_supports_gamma(ScrnInfoPtr pScrn)
 {
-    if (xf86CrtcConfigPrivateIndex != -1) {
+    if (dixPrivateKeyRegistered(&xf86crtc_screen_private_key)) {
         xf86CrtcConfigPtr xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
         xf86CrtcPtr crtc;
 

@@ -624,8 +624,6 @@ typedef struct _ScrnInfoRec {
     int yDpi;                   /* height DPI */
     const char *name;           /* Name to prefix messages */
     void *driverPrivate;        /* Driver private area */
-    DevUnion *privates;         /* Other privates can hook in
-                                 * here */
     DriverPtr drv;              /* xf86DriverList[] entry */
     void *module;               /* Pointer to module head */
     int colorKey;

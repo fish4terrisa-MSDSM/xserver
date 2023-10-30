@@ -62,8 +62,6 @@
 #include <sys/resource.h>
 #endif
 
-static int xf86ScrnInfoPrivateCount = 0;
-
 /* Add a pointer to a new DriverRec to xf86DriverList */
 
 void
@@ -186,7 +184,6 @@ xf86AllocateScreen(DriverPtr drv, int flags)
     }
 
     pScrn->origIndex = pScrn->scrnIndex;      /* This never changes */
-    pScrn->privates = xnfcalloc(sizeof(DevUnion), xf86ScrnInfoPrivateCount);
     /*
      * EnableDisableFBAccess now gets initialized in InitOutput()
      * pScrn->EnableDisableFBAccess = xf86EnableDisableFBAccess;
@@ -246,8 +243,6 @@ xf86DeleteScreen(ScrnInfoPtr pScrn)
     if (pScrn->drv)
         pScrn->drv->refCount--;
 
-    free(pScrn->privates);
-
     xf86ClearEntityListForScreen(pScrn);
 
     free(pScrn);
@@ -272,37 +267,6 @@ xf86DeleteScreen(ScrnInfoPtr pScrn)
             /* Also need to take care of the screen layout settings */
         }
     }
-}
-
-/*
- * Allocate a private in ScrnInfoRec.
- */
-
-int
-xf86AllocateScrnInfoPrivateIndex(void)
-{
-    int idx, i;
-    ScrnInfoPtr pScr;
-    DevUnion *nprivs;
-
-    idx = xf86ScrnInfoPrivateCount++;
-    for (i = 0; i < xf86NumScreens; i++) {
-        pScr = xf86Screens[i];
-        nprivs = xnfreallocarray(pScr->privates,
-                                 xf86ScrnInfoPrivateCount, sizeof(DevUnion));
-        /* Zero the new private */
-        memset(&nprivs[idx], 0, sizeof(DevUnion));
-        pScr->privates = nprivs;
-    }
-    for (i = 0; i < xf86NumGPUScreens; i++) {
-        pScr = xf86GPUScreens[i];
-        nprivs = xnfreallocarray(pScr->privates,
-                                 xf86ScrnInfoPrivateCount, sizeof(DevUnion));
-        /* Zero the new private */
-        memset(&nprivs[idx], 0, sizeof(DevUnion));
-        pScr->privates = nprivs;
-    }
-    return idx;
 }
 
 Bool
