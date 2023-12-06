@@ -792,17 +792,54 @@ vfbRRGetInfo(ScreenPtr pScreen, Rotation *rotations)
     return TRUE;
 }
 
+#if RANDR_12_INTERFACE
+static Bool
+addCrtc(ScreenPtr pScreen, const char *name, int x, int y, int width, int height)
+{
+    char modeInfoName[64];
+    xRRModeInfo modeInfo;
+    RROutputPtr output;
+    RRCrtcPtr crtc;
+    RRModePtr mode;
+
+    sprintf(modeInfoName, "%dx%d", width, height);
+    memset(&modeInfo, '\0', sizeof(modeInfo));
+    modeInfo.width = width;
+    modeInfo.height = height;
+    modeInfo.nameLength = strlen(modeInfoName);
+
+    mode = RRModeGet(&modeInfo, modeInfoName);
+    if (!mode)
+       return FALSE;
+
+    crtc = RRCrtcCreate(pScreen, NULL);
+    if (!crtc)
+       return FALSE;
+
+    /* This is to avoid xrandr to complain about the gamma missing */
+    RRCrtcGammaSetSize(crtc, 256);
+
+    output = RROutputCreate(pScreen, name, strlen(name), NULL);
+    if (!output)
+       return FALSE;
+    if (!RROutputSetClones(output, NULL, 0))
+       return FALSE;
+    if (!RROutputSetModes(output, &mode, 1, 0))
+       return FALSE;
+    if (!RROutputSetCrtcs(output, &crtc, 1))
+       return FALSE;
+    if (!RROutputSetConnection(output, RR_Connected))
+       return FALSE;
+    RRCrtcNotify(crtc, mode, x, y, RR_Rotate_0, NULL, 1, &output);
+
+    return TRUE;
+}
+#endif
+
 static Bool
 vfbRandRInit(ScreenPtr pScreen)
 {
     rrScrPrivPtr pScrPriv;
-#if RANDR_12_INTERFACE
-    RRModePtr  mode;
-    RRCrtcPtr  crtc;
-    RROutputPtr        output;
-    xRRModeInfo modeInfo;
-    char       name[64];
-#endif
 
     if (!RRScreenInit (pScreen))
        return FALSE;
@@ -822,35 +859,11 @@ vfbRandRInit(ScreenPtr pScreen)
                          1, 1,
                          pScreen->width, pScreen->height);
 
-    sprintf (name, "%dx%d", pScreen->width, pScreen->height);
-    memset (&modeInfo, '\0', sizeof (modeInfo));
-    modeInfo.width = pScreen->width;
-    modeInfo.height = pScreen->height;
-    modeInfo.nameLength = strlen (name);
-
-    mode = RRModeGet (&modeInfo, name);
-    if (!mode)
-       return FALSE;
-
-    crtc = RRCrtcCreate (pScreen, NULL);
-    if (!crtc)
-       return FALSE;
-
-    /* This is to avoid xrandr to complain about the gamma missing */
-    RRCrtcGammaSetSize (crtc, 256);
-
-    output = RROutputCreate (pScreen, "screen", 6, NULL);
-    if (!output)
-       return FALSE;
-    if (!RROutputSetClones (output, NULL, 0))
-       return FALSE;
-    if (!RROutputSetModes (output, &mode, 1, 0))
-       return FALSE;
-    if (!RROutputSetCrtcs (output, &crtc, 1))
-       return FALSE;
-    if (!RROutputSetConnection (output, RR_Connected))
-       return FALSE;
-    RRCrtcNotify (crtc, mode, 0, 0, RR_Rotate_0, NULL, 1, &output);
+    addCrtc(pScreen,
+            "screen",
+            0, 0,
+            pScreen->width,
+            pScreen->height);
 #endif
     return TRUE;
 }
