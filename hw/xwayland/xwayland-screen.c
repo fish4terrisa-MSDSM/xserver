@@ -845,6 +845,7 @@ xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
         else if (strcmp(argv[i], "-fullscreen") == 0) {
             use_fixed_size = 1;
             xwl_screen->fullscreen = 1;
+            xwl_screen->pending_fullscreen = 1;
         }
         else if (strcmp(argv[i], "-host-grab") == 0) {
             xwl_screen->host_grab = 1;

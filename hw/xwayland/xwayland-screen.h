@@ -64,6 +64,7 @@ struct xwl_screen {
     int present;
     int force_xrandr_emulation;
     int fullscreen;
+    int pending_fullscreen;
     int host_grab;
     int has_grab;
     int decorate;
