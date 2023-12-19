@@ -573,6 +573,21 @@ xwl_window_set_fullscreen(struct xwl_window *xwl_window)
     return TRUE;
 }
 
+static void
+xwl_window_unset_fullscreen(struct xwl_window *xwl_window)
+{
+#ifdef XWL_HAS_LIBDECOR
+    if (xwl_window->libdecor_frame)
+        libdecor_frame_unset_fullscreen(xwl_window->libdecor_frame);
+    else
+#endif
+    if (xwl_window->xdg_toplevel)
+        xdg_toplevel_unset_fullscreen(xwl_window->xdg_toplevel);
+
+    xwl_window_check_resolution_change_emulation(xwl_window);
+    xwl_window->wl_output_fullscreen = NULL;
+}
+
 void
 xwl_window_rootful_update_fullscreen(struct xwl_window *xwl_window,
                                      struct xwl_output *xwl_output)
