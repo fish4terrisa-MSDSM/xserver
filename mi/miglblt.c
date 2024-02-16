@@ -81,7 +81,7 @@ with the sample server.
 */
 
 void
-miPolyGlyphBlt(DrawablePtr pDrawable, GC * pGC, int x, int y, unsigned int nglyph, CharInfoPtr * ppci,  /* array of character info */
+miPolyGlyphBlt(DrawablePtr pDrawable, GCPtr pGC, int x, int y, unsigned int nglyph, CharInfoPtr * ppci,  /* array of character info */
                void *pglyphBase       /* start of array of glyphs */
     )
 {
@@ -182,7 +182,7 @@ miPolyGlyphBlt(DrawablePtr pDrawable, GC * pGC, int x, int y, unsigned int nglyp
 }
 
 void
-miImageGlyphBlt(DrawablePtr pDrawable, GC * pGC, int x, int y, unsigned int nglyph, CharInfoPtr * ppci, /* array of character info */
+miImageGlyphBlt(DrawablePtr pDrawable, GCPtr pGC, int x, int y, unsigned int nglyph, CharInfoPtr * ppci, /* array of character info */
                 void *pglyphBase      /* start of array of glyphs */
     )
 {
