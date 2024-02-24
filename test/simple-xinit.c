@@ -167,6 +167,10 @@ start_client(char *const *client_args, int display)
         execvp(client_args[0], client_args);
         /* exec only returns if an error occurred. */
         fprintf(stderr, "Error starting the client: %s\n", strerror(errno));
+        fprintf(stderr, "client args: ");
+        for (int i = 0; client_args[i]; i++)
+            fprintf(stderr, "%s ", client_args[i]);
+        fprintf(stderr, "\n");
         exit(1);
     }
 }

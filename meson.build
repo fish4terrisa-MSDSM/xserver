@@ -772,6 +772,8 @@ if build_docs or build_docs_devel
     ]
 endif
 
+piglit_runner = find_program('piglit-runner', required: false)
+
 # Include must come first, as it sets up dix-config.h
 subdir('include')
 

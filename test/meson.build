@@ -84,6 +84,30 @@ if get_option('xvfb')
         suite: 'xvfb'
     )
 
+    # Run just the glx-specific tests, not all of piglit.  Also glinfo,
+    # which nicely records the GL renderer that gets exposed, for manual
+    # sanity checking.
+    piglit_glx_test_args = [
+        '--profile', 'opengl',
+        '-t', '^glx',
+        '-t', 'glinfo',
+    ]
+
+    if piglit_runner.found()
+        test('glx',
+            find_program('scripts/run-piglit-runner.sh'),
+            args: [
+                '--output', join_paths(meson.current_build_dir(), 'xvfb-piglit'),
+                '--baseline', join_paths(meson.current_source_dir(), 'xvfb-glx-fails.txt'),
+                piglit_glx_test_args,
+                '--',
+                xvfb_args,
+            ],
+            env: piglit_env,
+            suite: 'xvfb'
+        )
+    endif
+
     if rendercheck.found()
         foreach rctest: rendercheck_tests
             test(rctest[0],
@@ -144,6 +168,31 @@ if get_option('xvfb')
                         )
                 endforeach
             endforeach
+        endif
+
+
+        if piglit_runner.found()
+            test('glx',
+                simple_xinit,
+                # Run just the glx-specific tests, not all of piglit.  Also glinfo,
+                # which nicely records the GL renderer that gets exposed, for manual
+                # sanity checking.
+                args: [
+                    find_program('scripts/run-piglit-runner.sh').path(),
+                    '--output', join_paths(meson.current_build_dir(), 'xephyr-glamor-piglit'),
+                    '--baseline', join_paths(meson.current_source_dir(), 'xephyr-glamor-glx-fails.txt'),
+                    piglit_glx_test_args,
+                    '----',
+                    xephyr_server.full_path(),
+                    '-glamor' + testsuite[1],
+                    '-glamor-skip-present',
+                    '-schedMax', '2000',
+                    '--',
+                    xvfb_args,
+                ],
+                env: piglit_env,
+                suite: 'xephyr-glamor'
+            )
         endif
     endif
 endif
