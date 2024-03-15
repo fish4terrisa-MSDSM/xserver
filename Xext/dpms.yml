@@ -1,0 +1,45 @@
+extension: DPMS
+requests:
+    DPMSGetVersion:
+        payload:
+            - name: 'majorVersion'
+              type: CARD16
+            - name: 'minorVersion'
+              type: CARD16
+    DPMSCapable: {}
+    DPMSGetTimeouts:
+        code:   X_DPMSGetTimeouts
+    DPMSSetTimeouts:
+        code:   X_DPMSSetTimeouts
+        payload:
+            - name: 'standby'
+              type: CARD16
+            - name: 'suspend'
+              type: CARD16
+            - name: 'off'
+              type: CARD16
+            - name: 'pad0'
+              type: CARD16
+    DPMSEnable:
+        code:   X_DPMSEnable
+        struct: xDPMSEnableReq
+    DPMSDisable:
+        code:   X_DPMSDisable
+        struct: xDPMSDisableReq
+    DPMSForceLevel:
+        code:   X_DPMSForceLevel
+        struct: xDPMSForceLevelReq
+        payload:
+            - name: 'level'
+              type: CARD16
+            - name: 'pad0'
+              type: CARD16
+    DPMSInfo:
+        code:   X_DPMSInfo
+    DPMSSelectInput:
+        code:   X_DPMSSelectInput
+        payload:
+            - name: 'length'
+              type: CARD16
+            - name: 'eventMask'
+              type: CARD32

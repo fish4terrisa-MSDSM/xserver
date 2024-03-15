@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+
+#
+# generator for extension marshal glue code
+#
+
+import sys
+import yaml
+
+def fixup_reqspec(reqname, reqspec):
+    if not 'name' in reqspec:
+        reqspec['name'] = reqname
+    if not 'sproc' in reqspec:
+        reqspec['sproc'] = "SProc%s" % reqspec['name']
+    if not 'proc' in reqspec:
+        reqspec['proc'] = "Proc%s" % reqspec['name']
+    if not 'struct' in reqspec:
+        reqspec['struct'] = "x%sReq" % reqspec['name']
+    if not 'code' in reqspec:
+        reqspec['code'] = "X_%s" % reqspec['name']
+
+    return reqspec
+
+def gen_sproc(reqspec):
+    txt = ("static int _X_COLD %s(ClientPtr client)\n" % reqspec['sproc'] +
+           "{\n" +
+           "    REQUEST(%s);\n\n" % reqspec['struct'] +
+           "    swaps(&stuff->length);\n")
+
+    if 'payload' in reqspec and reqspec['payload'] is not None:
+        for pl in reqspec['payload']:
+            if pl['type'] == "CARD8":
+                # nothing to do
+                pass
+            elif pl['type'] == "CARD16":
+                txt = txt + "    swaps(&stuff->%s);\n" % pl['name']
+            elif pl['type'] == "CARD32":
+                txt = txt + "    swapl(&stuff->%s);\n" % pl['name']
+            else:
+                raise Exception("unknown payload type %s in %s field of %s" % (pl['type'], pl['name'], reqspec['name']))
+
+    txt = (txt + "    return %s(client);\n" % reqspec['proc']
+               + "}\n\n")
+
+    return txt
+
+def gen_sdispatch(spec):
+    procname = "SProc%sDispatch" % spec['extension']
+
+    txt = ("static int _X_COLD %s(ClientPtr client)\n" % procname +
+           "{\n" +
+           "    REQUEST(xReq);\n" +
+           "    switch (stuff->data) {\n")
+
+    for rname in spec['requests']:
+        rspec = fixup_reqspec(rname, spec['requests'][rname])
+        txt = txt + "    case %s:\n" % rspec['code']
+        txt = txt + "        return %s(client);\n" % rspec['sproc']
+
+    return txt + (
+        "    default:\n" +
+        "        return BadRequest;\n" +
+        "    }\n" +
+        "}\n")
+
+def gen_dispatch(spec):
+    procname = "Proc%sDispatch" % spec['extension']
+
+    txt = ("static int _X_COLD %s(ClientPtr client)\n" % procname +
+           "{\n" +
+           "    REQUEST(xReq);\n" +
+           "    switch (stuff->data) {\n")
+
+    for rname in spec['requests']:
+        rspec = fixup_reqspec(rname, spec['requests'][rname])
+        txt = txt + "    case %s:\n" % rspec['code']
+        txt = txt + "        REQUEST_SIZE_MATCH(%s);\n" % rspec['struct']
+        txt = txt + "        return %s(client);\n" % rspec['sproc']
+
+    return txt + (
+        "    default:\n" +
+        "        return BadRequest;\n" +
+        "    }\n" +
+        "}\n")
+
+def gen_include(specfile, outfile):
+
+    print("%s: in=%s out=%s" % (sys.argv[0], specfile, outfile))
+
+    with open(specfile, 'r') as f:
+        spec = yaml.safe_load(f)
+
+    outf = open(outfile, "w")
+
+    requests = spec['requests']
+    for rname in requests:
+        rspec = fixup_reqspec(rname, requests[rname])
+        outf.write(gen_sproc(rspec))
+
+    outf.write(gen_sdispatch(spec))
+    outf.write(gen_dispatch(spec))
+    outf.close()
+
+gen_include(sys.argv[1], sys.argv[2])

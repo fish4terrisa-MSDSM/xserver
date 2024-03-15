@@ -16,6 +16,7 @@ hdrs_xext = [
 
 if build_dpms
     srcs_xext += 'dpms.c'
+    srcs_xext += extension_marshal_generator.process('dpms.yml')
 endif
 
 if build_mitshm
