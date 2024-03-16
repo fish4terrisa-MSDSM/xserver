@@ -555,9 +555,6 @@ xwl_window_set_fullscreen(struct xwl_window *xwl_window)
     struct xwl_output *xwl_output;
     struct wl_output *wl_output = NULL;
 
-    if (!xwl_window->xdg_toplevel)
-        return FALSE;
-
     xwl_output = xwl_window_get_output(xwl_window);
     if (xwl_output)
         wl_output = xwl_output->output;
@@ -565,13 +562,35 @@ xwl_window_set_fullscreen(struct xwl_window *xwl_window)
     if (wl_output && xwl_window->wl_output_fullscreen == wl_output)
         return FALSE;
 
-    xdg_toplevel_set_fullscreen(xwl_window->xdg_toplevel, wl_output);
+#ifdef XWL_HAS_LIBDECOR
+    if (xwl_window->libdecor_frame)
+        libdecor_frame_set_fullscreen(xwl_window->libdecor_frame, wl_output);
+    else
+#endif
+    if (xwl_window->xdg_toplevel)
+        xdg_toplevel_set_fullscreen(xwl_window->xdg_toplevel, wl_output);
+
     xwl_window_check_resolution_change_emulation(xwl_window);
     wl_surface_commit(xwl_window->surface);
 
     xwl_window->wl_output_fullscreen = wl_output;
 
     return TRUE;
+}
+
+static void
+xwl_window_unset_fullscreen(struct xwl_window *xwl_window)
+{
+#ifdef XWL_HAS_LIBDECOR
+    if (xwl_window->libdecor_frame)
+        libdecor_frame_unset_fullscreen(xwl_window->libdecor_frame);
+    else
+#endif
+    if (xwl_window->xdg_toplevel)
+        xdg_toplevel_unset_fullscreen(xwl_window->xdg_toplevel);
+
+    xwl_window_check_resolution_change_emulation(xwl_window);
+    xwl_window->wl_output_fullscreen = NULL;
 }
 
 void
@@ -691,6 +710,7 @@ handle_libdecor_configure(struct libdecor_frame *frame,
 {
     struct xwl_window *xwl_window = data;
     struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
+    enum libdecor_window_state window_state;
     int width, height;
 
     if (!libdecor_configuration_get_content_size(configuration, frame, &width, &height)) {
@@ -698,7 +718,24 @@ handle_libdecor_configure(struct libdecor_frame *frame,
         height = xwl_screen->height;
     }
 
-    xwl_window_maybe_resize(xwl_window, width, height);
+    if (!libdecor_configuration_get_window_state(configuration, &window_state))
+        window_state = LIBDECOR_WINDOW_STATE_NONE;
+
+    xwl_screen->pending_fullscreen =
+        !!(window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN);
+
+    if (xwl_screen->pending_fullscreen != xwl_screen->fullscreen) {
+        xwl_screen->fullscreen = xwl_screen->pending_fullscreen;
+
+        if (xwl_screen->fullscreen)
+            xwl_window_set_fullscreen(xwl_window);
+        else
+            xwl_window_unset_fullscreen(xwl_window);
+    }
+
+    if (!xwl_screen->fullscreen && !xwl_screen->pending_fullscreen)
+        xwl_window_maybe_resize(xwl_window, width, height);
+
     xwl_window_update_libdecor_size(xwl_window, configuration,
                                     xwl_screen->width, xwl_screen->height);
     wl_surface_commit(xwl_window->surface);
@@ -743,8 +780,14 @@ xdg_surface_handle_configure(void *data,
     struct xwl_window *xwl_window = data;
     struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
 
-    if (xwl_screen->fullscreen)
-        xwl_window_set_fullscreen(xwl_window);
+    if (xwl_screen->pending_fullscreen != xwl_screen->fullscreen) {
+        xwl_screen->fullscreen = xwl_screen->pending_fullscreen;
+
+        if (xwl_screen->fullscreen)
+            xwl_window_set_fullscreen(xwl_window);
+        else
+            xwl_window_unset_fullscreen(xwl_window);
+    }
 
     xdg_surface_ack_configure(xdg_surface, serial);
     wl_surface_commit(xwl_window->surface);
@@ -795,12 +838,22 @@ xdg_toplevel_handle_configure(void *data,
 {
     struct xwl_window *xwl_window = data;
     struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
+    uint32_t *p;
 
     /* Maintain our current size if no dimensions are requested */
     if (width == 0 && height == 0)
         return;
 
-    if (!xwl_screen->fullscreen) {
+    xwl_screen->pending_fullscreen = 0;
+    wl_array_for_each (p, states) {
+        uint32_t state = *p;
+        if (state == XDG_TOPLEVEL_STATE_FULLSCREEN) {
+            xwl_screen->pending_fullscreen = 1;
+            break;
+        }
+    }
+
+    if (!xwl_screen->fullscreen && !xwl_screen->pending_fullscreen) {
         /* This will be committed by the xdg_surface.configure handler */
         xwl_window_maybe_resize(xwl_window, width, height);
     }
