@@ -53,7 +53,7 @@ struct xwl_output {
     struct wl_output *output;
     struct zxdg_output_v1 *xdg_output;
     uint32_t server_output_id;
-    int32_t x, y, width, height, refresh;
+    int32_t x, y, width, height, physical_width, physical_height, refresh;
     Rotation rotation;
     Bool wl_output_done;
     Bool xdg_output_done;

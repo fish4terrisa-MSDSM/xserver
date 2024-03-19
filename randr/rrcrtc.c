@@ -1457,13 +1457,13 @@ ProcRRSetCrtcConfig(ClientPtr client)
 
             RRModeGetScanoutSize(mode, &transform, &source_width,
                                  &source_height);
-            if (stuff->x + source_width > width) {
+            if (FALSE && stuff->x + source_width > width) {
                 client->errorValue = stuff->x;
                 free(outputs);
                 return BadValue;
             }
 
-            if (stuff->y + source_height > height) {
+            if (FALSE && stuff->y + source_height > height) {
                 client->errorValue = stuff->y;
                 free(outputs);
                 return BadValue;
