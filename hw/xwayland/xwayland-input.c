@@ -611,10 +611,15 @@ pointer_handle_leave(void *data, struct wl_pointer *pointer,
 
     xwl_screen->serial = serial;
 
-    /* The pointer has left a known xwindow, save it for a possible match
-     * in sprite_check_lost_focus()
-     */
     if (xwl_seat->focus_window) {
+        if (xwl_seat->pointer_warp_emulator) {
+            if (xwl_seat->focus_window == xwl_seat->pointer_warp_emulator->locked_window)
+                xwl_seat_destroy_pointer_warp_emulator(xwl_seat);
+        }
+
+        /* The pointer has left a known xwindow, save it for a possible match
+         * in sprite_check_lost_focus()
+         */
         xwl_seat->last_xwindow = xwl_seat->focus_window->window;
         xwl_seat->focus_window = NULL;
         focus_lost = TRUE;
