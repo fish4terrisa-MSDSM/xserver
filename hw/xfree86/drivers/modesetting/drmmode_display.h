@@ -134,6 +134,7 @@ typedef struct {
     Bool can_async_flip;
     Bool async_flip_secondaries;
     Bool dri2_enable;
+    Bool dri3_enable;
     Bool present_enable;
     Bool tearfree_enable;
 

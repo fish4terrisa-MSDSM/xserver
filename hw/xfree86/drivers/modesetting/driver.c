@@ -2155,6 +2155,12 @@ ScreenInit(ScreenPtr pScreen, int argc, char **argv)
                        "Failed to initialize the DRI2 extension.\n");
         }
 
+        if (!(ms->drmmode.dri3_enable = ms_dri3_screen_init(pScreen))) {
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+                       "Failed to initialize the DRI3 extension.\n");
+        }
+
+
         /* enable reverse prime if we are a GPU screen, and accelerated, and not
          * i915, evdi or udl. i915 is happy scanning out from sysmem.
          * evdi and udl are virtual drivers scanning out from sysmem
@@ -2296,8 +2302,11 @@ CloseScreen(ScreenPtr pScreen)
     if (ms->drmmode.dri2_enable) {
         ms_dri2_close_screen(pScreen);
     }
-#endif
 
+    if (ms->drmmode.dri3_enable) {
+        ms_dri3_close_screen(pScreen);
+    }
+#endif
     ms_vblank_close_screen(pScreen);
 
     if (ms->damage) {
