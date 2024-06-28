@@ -62,6 +62,7 @@ extern _X_EXPORT Bool noCompositeExtension;
 extern _X_EXPORT Bool noPanoramiXExtension;
 #endif
 
+/* required by: intel_drv */
 #if defined(XV)
 extern _X_EXPORT Bool noXvExtension;
 #endif
