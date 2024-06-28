@@ -39,7 +39,6 @@ from The Open Group.
 #include <X11/keysym.h>
 #include "xserver-properties.h"
 #include "exevents.h"
-#include "extinit.h"
 
 void
 ProcessInputEvents(void)
