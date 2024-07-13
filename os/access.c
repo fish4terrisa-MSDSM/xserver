@@ -638,7 +638,7 @@ DefineSelf(struct _XtransConnInfo *ci)
 #ifdef USE_SIOCGLIFCONF
 
 #ifdef SIOCGLIFNUM
-    ifn.lifn_family = AF_UNSPEC;
+    ifn.lifn_family = ci->family;
     ifn.lifn_flags = 0;
     if (ioctl(fd, SIOCGLIFNUM, (char *) &ifn) < 0)
         ErrorF("Getting interface count: %s\n", strerror(errno));
@@ -648,7 +648,7 @@ DefineSelf(struct _XtransConnInfo *ci)
     }
 #endif
 
-    ifc.lifc_family = AF_UNSPEC;
+    ifc.lifc_family = ci->family;
     ifc.lifc_flags = 0;
     ifc.lifc_len = len;
     ifc.lifc_buf = bufptr;
