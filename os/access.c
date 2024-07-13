@@ -86,10 +86,6 @@ SOFTWARE.
 
 #include <stdio.h>
 #include <stdlib.h>
-#define XSERV_t
-#define TRANS_SERVER
-#define TRANS_REOPEN
-#include <X11/Xtrans/Xtrans.h>
 #include <X11/Xauth.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
@@ -440,7 +436,7 @@ ifioctl(int fd, int cmd, char *arg)
 
 #if !defined(SIOCGIFCONF)
 void
-DefineSelf(int fd)
+DefineSelf(struct _XtransConnInfo *ci)
 {
 #if !defined(TCPCONN) && !defined(UNIXCONN)
     return;
@@ -470,6 +466,25 @@ DefineSelf(int fd)
     _Xgethostbynameparams hparams;
 #endif
 
+    if (_XSERVTransIsLocal(ci)) {
+        /*
+         * add something of FamilyLocalHost
+         */
+        for (host = selfhosts;
+             host && !addrEqual(FamilyLocalHost, "", 0, host); host = host->next);
+        if (!host) {
+            MakeHost(host, 0);
+            if (host) {
+                host->family = FamilyLocalHost;
+                host->len = 0;
+                /* Nothing to store in host->addr */
+                host->next = selfhosts;
+                selfhosts = host;
+            }
+        }
+        return;
+    }
+
     /* Why not use gethostname()?  Well, at least on my system, I've had to
      * make an ugly kernel patch to get a name longer than 8 characters, and
      * uname() lets me access to the whole string (it smashes release, you
@@ -479,6 +494,8 @@ DefineSelf(int fd)
 
     hp = _XGethostbyname(name.nodename, hparams);
     if (hp != NULL) {
+        if (hp->h_addrtype != ci->family)
+            return;
         saddr.sa.sa_family = hp->h_addrtype;
         switch (hp->h_addrtype) {
         case AF_INET:
@@ -494,7 +511,7 @@ DefineSelf(int fd)
             break;
 #endif
         default:
-            goto DefineLocalHost;
+            return;
         }
         family = ConvertAddr(&(saddr.sa), &len, (void **) &addr);
         if (family != -1 && family != FamilyLocal) {
@@ -505,12 +522,12 @@ DefineSelf(int fd)
                 /* add this host to the host list.      */
                 MakeHost(host, len)
                     if (host) {
-                    host->family = family;
-                    host->len = len;
-                    memcpy(host->addr, addr, len);
-                    host->next = selfhosts;
-                    selfhosts = host;
-                }
+                        host->family = family;
+                        host->len = len;
+                        memcpy(host->addr, addr, len);
+                        host->next = selfhosts;
+                        selfhosts = host;
+                    }
 #ifdef XDMCP
                 /*
                  *  If this is an Internet Address, but not the localhost
@@ -539,22 +556,6 @@ DefineSelf(int fd)
 
 #endif                          /* XDMCP */
             }
-        }
-    }
-    /*
-     * now add a host of family FamilyLocalHost...
-     */
- DefineLocalHost:
-    for (host = selfhosts;
-         host && !addrEqual(FamilyLocalHost, "", 0, host); host = host->next);
-    if (!host) {
-        MakeHost(host, 0);
-        if (host) {
-            host->family = FamilyLocalHost;
-            host->len = 0;
-            /* Nothing to store in host->addr */
-            host->next = selfhosts;
-            selfhosts = host;
         }
     }
 #endif                          /* !TCPCONN && !UNIXCONN */
@@ -593,7 +594,7 @@ in6_fillscopeid(struct sockaddr_in6 *sin6)
 #endif
 
 void
-DefineSelf(int fd)
+DefineSelf(struct _XtransConnInfo *ci)
 {
 #ifndef HAVE_GETIFADDRS
     char *cp, *cplim;
@@ -619,6 +620,24 @@ DefineSelf(int fd)
     unsigned char *addr;
     int family;
     register HOST *host;
+    if (_XSERVTransIsLocal(ci)) {
+        /*
+         * add something of FamilyLocalHost
+         */
+        for (host = selfhosts;
+             host && !addrEqual(FamilyLocalHost, "", 0, host); host = host->next);
+        if (!host) {
+            MakeHost(host, 0);
+            if (host) {
+                host->family = FamilyLocalHost;
+                host->len = 0;
+                /* Nothing to store in host->addr */
+                host->next = selfhosts;
+                selfhosts = host;
+            }
+        }
+        return;
+    }
 
 #ifndef HAVE_GETIFADDRS
 
@@ -659,7 +678,7 @@ DefineSelf(int fd)
 #define IFR_IFR_NAME ifr->ifr_name
 #endif
 
-    if (ifioctl(fd, IFC_IOCTL_REQ, (void *) &ifc) < 0)
+    if (ifioctl(ci->fd, IFC_IOCTL_REQ, (void *) &ifc) < 0)
         ErrorF("Getting interface configuration (4): %s\n", strerror(errno));
 
     cplim = (char *) IFC_IFC_REQ + IFC_IFC_LEN;
@@ -744,12 +763,12 @@ DefineSelf(int fd)
                 struct lifreq broad_req;
 
                 broad_req = *ifr;
-                if (ioctl(fd, SIOCGLIFFLAGS, (char *) &broad_req) != -1 &&
+                if (ioctl(ci->fd, SIOCGLIFFLAGS, (char *) &broad_req) != -1 &&
                     (broad_req.lifr_flags & IFF_BROADCAST) &&
                     (broad_req.lifr_flags & IFF_UP)
                     ) {
                     broad_req = *ifr;
-                    if (ioctl(fd, SIOCGLIFBRDADDR, &broad_req) != -1)
+                    if (ioctl(ci->fd, SIOCGLIFBRDADDR, &broad_req) != -1)
                         broad_addr = broad_req.lifr_broadaddr;
                     else
                         continue;
@@ -763,12 +782,12 @@ DefineSelf(int fd)
                 struct ifreq broad_req;
 
                 broad_req = *ifr;
-                if (ifioctl(fd, SIOCGIFFLAGS, (void *) &broad_req) != -1 &&
+                if (ifioctl(ci->fd, SIOCGIFFLAGS, (void *) &broad_req) != -1 &&
                     (broad_req.ifr_flags & IFF_BROADCAST) &&
                     (broad_req.ifr_flags & IFF_UP)
                     ) {
                     broad_req = *ifr;
-                    if (ifioctl(fd, SIOCGIFBRDADDR, (void *) &broad_req) != -1)
+                    if (ifioctl(ci->fd, SIOCGIFBRDADDR, (void *) &broad_req) != -1)
                         broad_addr = broad_req.ifr_addr;
                     else
                         continue;
@@ -789,7 +808,8 @@ DefineSelf(int fd)
         return;
     }
     for (ifr = ifap; ifr != NULL; ifr = ifr->ifa_next) {
-        if (!ifr->ifa_addr)
+        if (!ifr->ifa_addr
+            || ifr->ifa_addr->sa_family != ci->family)
             continue;
         len = sizeof(*(ifr->ifa_addr));
         family = ConvertAddr((struct sockaddr *) ifr->ifa_addr, &len,
@@ -868,22 +888,6 @@ DefineSelf(int fd)
     }                           /* for */
     freeifaddrs(ifap);
 #endif                          /* HAVE_GETIFADDRS */
-
-    /*
-     * add something of FamilyLocalHost
-     */
-    for (host = selfhosts;
-         host && !addrEqual(FamilyLocalHost, "", 0, host); host = host->next);
-    if (!host) {
-        MakeHost(host, 0);
-        if (host) {
-            host->family = FamilyLocalHost;
-            host->len = 0;
-            /* Nothing to store in host->addr */
-            host->next = selfhosts;
-            selfhosts = host;
-        }
-    }
 }
 #endif                          /* hpux && !HAVE_IFREQ */
 

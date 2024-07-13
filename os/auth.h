@@ -3,6 +3,11 @@
 
 #include <X11/X.h>
 
+#define XSERV_t
+#define TRANS_SERVER
+#define TRANS_REOPEN
+#include <X11/Xtrans/Xtransint.h>
+
 #include "dix.h"
 
 #define AuthInitArgs void
@@ -102,7 +107,7 @@ void AddLocalHosts(void);
 void ResetHosts(const char *display);
 
 /* register local hosts entries for outself, based on listening fd */
-void DefineSelf(int fd);
+void DefineSelf(XtransConnInfo ci);
 
 /* check whether given addr belongs to ourself */
 void AugmentSelf(void *from, int len);

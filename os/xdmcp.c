@@ -19,10 +19,6 @@
 
 #ifdef WIN32
 #include <X11/Xwinsock.h>
-#define XSERV_t
-#define TRANS_SERVER
-#define TRANS_REOPEN
-#include <X11/Xtrans/Xtrans.h>
 #endif
 
 #include <X11/Xos.h>
@@ -49,11 +45,6 @@
 #include "xdmauth.h"
 #include "input.h"
 #include "dixstruct.h"
-
-#define XSERV_t
-#define TRANS_SERVER
-#define TRANS_REOPEN
-#include <X11/Xtrans/Xtrans.h>
 
 #ifdef XDMCP
 #undef REQUEST

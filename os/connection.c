@@ -277,11 +277,9 @@ CreateWellKnownSockets(void)
     for (i = 0; i < ListenTransCount; i++) {
         int fd = _XSERVTransGetConnectionNumber(ListenTransConns[i]);
 
+        DefineSelf(ListenTransConns[i]);
         ListenTransFds[i] = fd;
         SetNotifyFd(fd, EstablishNewConnections, X_NOTIFY_READ, NULL);
-
-        if (!_XSERVTransIsLocal(ListenTransConns[i]))
-            DefineSelf (fd);
     }
 
     if (ListenTransCount == 0 && !NoListenAll)
