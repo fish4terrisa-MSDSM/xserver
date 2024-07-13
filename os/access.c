@@ -210,11 +210,11 @@ static Bool NewHost(int /*family */ ,
                     int /* addingLocalHosts */ );
 
 /* XFree86 bug #156: To keep track of which hosts were explicitly requested in
-   /etc/X<display>.hosts, we've added a requested field to the HOST struct,
-   and a LocalHostRequested variable.  These default to FALSE, but are set
-   to TRUE in ResetHosts when reading in /etc/X<display>.hosts.  They are
-   checked in DisableLocalHost(), which is called to disable the default
-   local host entries when stronger authentication is turned on. */
+   /etc/X<display>.hosts, we've added a requested field to the HOST struct.
+   This defaults to FALSE, but is set to TRUE in ResetHosts when reading in
+   /etc/X<display>.hosts.  It is checked in DisableLocalHost(), which is called
+   to disable the default local host entries when stronger authentication is
+   turned on. */
 
 typedef struct _host {
     short family;
@@ -233,8 +233,6 @@ typedef struct _host {
 static HOST *selfhosts = NULL;
 static HOST *validhosts = NULL;
 static int AccessEnabled = TRUE;
-static int LocalHostEnabled = FALSE;
-static int LocalHostRequested = FALSE;
 static int UsingXdmcp = FALSE;
 
 static enum {
@@ -280,10 +278,8 @@ EnableLocalAccess(void)
 
 static void EnableLocalHost(void)
 {
-    if (!UsingXdmcp) {
-        LocalHostEnabled = TRUE;
+    if (!UsingXdmcp)
         AddLocalHosts();
-    }
 }
 
 /*
@@ -307,9 +303,6 @@ DisableLocalAccess(void)
 static void DisableLocalHost(void)
 {
     HOST *self;
-
-    if (!LocalHostRequested)    /* Fix for XFree86 bug #156 */
-        LocalHostEnabled = FALSE;
     for (self = selfhosts; self; self = self->next) {
         if (!self->requested)   /* Fix for XFree86 bug #156 */
             (void) RemoveHost((ClientPtr) NULL, self->family, self->len,
@@ -392,7 +385,6 @@ void
 AccessUsingXdmcp(void)
 {
     UsingXdmcp = TRUE;
-    LocalHostEnabled = FALSE;
 }
 
 #if  defined(SVR4) && !defined(__sun)  && defined(SIOCGIFCONF) && !defined(USE_SIOCGLIFCONF)
@@ -955,7 +947,6 @@ ResetHosts(const char *display)
 
     siTypesInitialize();
     AccessEnabled = !defeatAccessControl;
-    LocalHostEnabled = FALSE;
     while ((host = validhosts) != 0) {
         validhosts = host->next;
         FreeHost(host);
@@ -988,7 +979,6 @@ ResetHosts(const char *display)
             if (!strncmp("local:", lhostname, 6)) {
                 family = FamilyLocalHost;
                 NewHost(family, "", 0, FALSE);
-                LocalHostRequested = TRUE;      /* Fix for XFree86 bug #156 */
             }
 #if defined(TCPCONN)
             else if (!strncmp("inet:", lhostname, 5)) {
@@ -1325,7 +1315,6 @@ AddHost(ClientPtr client, int family, unsigned length,  /* of bytes in pAddr */
     switch (family) {
     case FamilyLocalHost:
         len = length;
-        LocalHostEnabled = TRUE;
         break;
     case FamilyInternet:
 #if defined(IPv6)
@@ -1408,7 +1397,6 @@ RemoveHost(ClientPtr client, int family, unsigned length,       /* of bytes in p
     switch (family) {
     case FamilyLocalHost:
         len = length;
-        LocalHostEnabled = FALSE;
         break;
     case FamilyInternet:
 #if defined(IPv6)
@@ -1529,21 +1517,17 @@ InvalidHost(register struct sockaddr *saddr, int len, ClientPtr client)
     if (family == -1)
         return 1;
     if (family == FamilyLocal) {
-        if (!LocalHostEnabled) {
-            /*
-             * check to see if any local address is enabled.  This
-             * implicitly enables local connections.
-             */
-            for (selfhost = selfhosts; selfhost; selfhost = selfhost->next) {
-                for (host = validhosts; host; host = host->next) {
-                    if (addrEqual(selfhost->family, selfhost->addr,
-                                  selfhost->len, host))
-                        return 0;
-                }
+        /*
+         * check to see if any local address is enabled.  This
+         * implicitly enables local connections.
+         */
+        for (selfhost = selfhosts; selfhost; selfhost = selfhost->next) {
+            for (host = validhosts; host; host = host->next) {
+                if (addrEqual(selfhost->family, selfhost->addr,
+                              selfhost->len, host))
+                    return 0;
             }
         }
-        else
-            return 0;
     }
     for (host = validhosts; host; host = host->next) {
         if (host->family == FamilyServerInterpreted) {
