@@ -171,7 +171,6 @@ int
 ProcXkbUseExtension(ClientPtr client)
 {
     REQUEST(xkbUseExtensionReq);
-    xkbUseExtensionReply rep;
     int supported;
 
     REQUEST_SIZE_MATCH(xkbUseExtensionReq);
@@ -195,11 +194,11 @@ ProcXkbUseExtension(ClientPtr client)
              stuff->wantedMinor, SERVER_XKB_MAJOR_VERSION,
              SERVER_XKB_MINOR_VERSION);
     }
-    rep = (xkbUseExtensionReply) {
+
+    xkbUseExtensionReply rep = {
         .type = X_Reply,
         .supported = supported,
         .sequenceNumber = client->sequence,
-        .length = 0,
         .serverMajor = SERVER_XKB_MAJOR_VERSION,
         .serverMinor = SERVER_XKB_MINOR_VERSION
     };
@@ -581,7 +580,6 @@ ProcXkbGetState(ClientPtr client)
 {
     REQUEST(xkbGetStateReq);
     DeviceIntPtr dev;
-    xkbGetStateReply rep;
     XkbStateRec *xkb;
 
     REQUEST_SIZE_MATCH(xkbGetStateReq);
@@ -592,11 +590,11 @@ ProcXkbGetState(ClientPtr client)
     CHK_KBD_DEVICE(dev, stuff->deviceSpec, client, DixGetAttrAccess);
 
     xkb = &dev->key->xkbInfo->state;
-    rep = (xkbGetStateReply) {
+
+    xkbGetStateReply rep = {
         .type = X_Reply,
         .deviceID = dev->id,
         .sequenceNumber = client->sequence,
-        .length = 0,
         .mods = XkbStateFieldFromRec(xkb) & 0xff,
         .baseMods = xkb->base_mods,
         .latchedMods = xkb->latched_mods,
@@ -691,7 +689,6 @@ ProcXkbLatchLockState(ClientPtr client)
 int
 ProcXkbGetControls(ClientPtr client)
 {
-    xkbGetControlsReply rep;
     XkbControlsPtr xkb;
     DeviceIntPtr dev;
 
@@ -704,12 +701,13 @@ ProcXkbGetControls(ClientPtr client)
     CHK_KBD_DEVICE(dev, stuff->deviceSpec, client, DixGetAttrAccess);
 
     xkb = dev->key->xkbInfo->desc->ctrls;
-    rep = (xkbGetControlsReply) {
+
+    xkbGetControlsReply rep = {
         .type = X_Reply,
         .deviceID = ((DeviceIntPtr) dev)->id,
         .sequenceNumber = client->sequence,
-        .length = bytes_to_int32(SIZEOF(xkbGetControlsReply) -
-                                 SIZEOF(xGenericReply)),
+        .length = bytes_to_int32(sizeof(xkbGetControlsReply) -
+                                 sizeof(xGenericReply)),
         .mkDfltBtn = xkb->mk_dflt_btn,
         .numGroups = xkb->num_groups,
         .groupsWrap = xkb->groups_wrap,
@@ -1461,7 +1459,6 @@ int
 ProcXkbGetMap(ClientPtr client)
 {
     DeviceIntPtr dev;
-    xkbGetMapReply rep;
     XkbDescRec *xkb;
     int n, status;
 
@@ -1477,18 +1474,19 @@ ProcXkbGetMap(ClientPtr client)
     CHK_MASK_LEGAL(0x03, stuff->partial, XkbAllMapComponentsMask);
 
     xkb = dev->key->xkbInfo->desc;
-    rep = (xkbGetMapReply) {
+
+    xkbGetMapReply rep = {
         .type = X_Reply,
         .deviceID = dev->id,
         .sequenceNumber = client->sequence,
-        .length = (SIZEOF(xkbGetMapReply) - SIZEOF(xGenericReply)) >> 2,
+        .length = bytes_to_int32(sizeof(xkbGetMapReply) - sizeof(xGenericReply)),
         .present = stuff->partial | stuff->full,
         .minKeyCode = xkb->min_key_code,
-        .maxKeyCode = xkb->max_key_code
+        .maxKeyCode = xkb->max_key_code,
+        .totalTypes = xkb->map->num_types,
     };
 
     if (stuff->full & XkbKeyTypesMask) {
-        rep.firstType = 0;
         rep.nTypes = xkb->map->num_types;
     }
     else if (stuff->partial & XkbKeyTypesMask) {
@@ -1500,9 +1498,6 @@ ProcXkbGetMap(ClientPtr client)
         rep.firstType = stuff->firstType;
         rep.nTypes = stuff->nTypes;
     }
-    else
-        rep.nTypes = 0;
-    rep.totalTypes = xkb->map->num_types;
 
     n = XkbNumKeys(xkb);
     if (stuff->full & XkbKeySymsMask) {
@@ -1514,9 +1509,6 @@ ProcXkbGetMap(ClientPtr client)
         rep.firstKeySym = stuff->firstKeySym;
         rep.nKeySyms = stuff->nKeySyms;
     }
-    else
-        rep.nKeySyms = 0;
-    rep.totalSyms = 0;
 
     if (stuff->full & XkbKeyActionsMask) {
         rep.firstKeyAct = xkb->min_key_code;
@@ -1527,9 +1519,6 @@ ProcXkbGetMap(ClientPtr client)
         rep.firstKeyAct = stuff->firstKeyAct;
         rep.nKeyActs = stuff->nKeyActs;
     }
-    else
-        rep.nKeyActs = 0;
-    rep.totalActs = 0;
 
     if (stuff->full & XkbKeyBehaviorsMask) {
         rep.firstKeyBehavior = xkb->min_key_code;
@@ -1540,9 +1529,6 @@ ProcXkbGetMap(ClientPtr client)
         rep.firstKeyBehavior = stuff->firstKeyBehavior;
         rep.nKeyBehaviors = stuff->nKeyBehaviors;
     }
-    else
-        rep.nKeyBehaviors = 0;
-    rep.totalKeyBehaviors = 0;
 
     if (stuff->full & XkbVirtualModsMask)
         rep.virtualMods = ~0;
@@ -1558,9 +1544,6 @@ ProcXkbGetMap(ClientPtr client)
         rep.firstKeyExplicit = stuff->firstKeyExplicit;
         rep.nKeyExplicit = stuff->nKeyExplicit;
     }
-    else
-        rep.nKeyExplicit = 0;
-    rep.totalKeyExplicit = 0;
 
     if (stuff->full & XkbModifierMapMask) {
         rep.firstModMapKey = xkb->min_key_code;
@@ -1571,9 +1554,6 @@ ProcXkbGetMap(ClientPtr client)
         rep.firstModMapKey = stuff->firstModMapKey;
         rep.nModMapKeys = stuff->nModMapKeys;
     }
-    else
-        rep.nModMapKeys = 0;
-    rep.totalModMapKeys = 0;
 
     if (stuff->full & XkbVirtualModMapMask) {
         rep.firstVModMapKey = xkb->min_key_code;
@@ -1584,9 +1564,6 @@ ProcXkbGetMap(ClientPtr client)
         rep.firstVModMapKey = stuff->firstVModMapKey;
         rep.nVModMapKeys = stuff->nVModMapKeys;
     }
-    else
-        rep.nVModMapKeys = 0;
-    rep.totalVModMapKeys = 0;
 
     if ((status = XkbComputeGetMapReplySize(xkb, &rep)) != Success)
         return status;
@@ -2154,14 +2131,11 @@ SetKeySyms(ClientPtr client,
             s = XkbKeyNumGroups(xkb, i);
     }
     if (s != xkb->ctrls->num_groups) {
-        xkbControlsNotify cn;
-        XkbControlsRec old;
-
-        cn.keycode = 0;
-        cn.eventType = 0;
-        cn.requestMajor = XkbReqCode;
-        cn.requestMinor = X_kbSetMap;
-        old = *xkb->ctrls;
+        xkbControlsNotify cn = {
+            .requestMajor = XkbReqCode,
+            .requestMinor = X_kbSetMap,
+        };
+        XkbControlsRec old = *xkb->ctrls;
         xkb->ctrls->num_groups = s;
         if (XkbComputeControlsNotify(dev, &old, xkb->ctrls, &cn, FALSE))
             XkbSendControlsNotify(dev, &cn);
@@ -2897,7 +2871,6 @@ XkbSendCompatMap(ClientPtr client,
 int
 ProcXkbGetCompatMap(ClientPtr client)
 {
-    xkbGetCompatMapReply rep;
     DeviceIntPtr dev;
     XkbDescPtr xkb;
     XkbCompatMapPtr compat;
@@ -2913,13 +2886,14 @@ ProcXkbGetCompatMap(ClientPtr client)
     xkb = dev->key->xkbInfo->desc;
     compat = xkb->compat;
 
-    rep = (xkbGetCompatMapReply) {
+    xkbGetCompatMapReply rep = {
         .type = X_Reply,
         .sequenceNumber = client->sequence,
-        .length = 0,
         .deviceID = dev->id,
         .firstSI = stuff->firstSI,
-        .nSI = stuff->nSI
+        .nSI = stuff->nSI,
+        .nTotalSI = compat->num_si,
+        .groups = stuff->groups,
     };
     if (stuff->getAllSI) {
         rep.firstSI = 0;
@@ -2930,8 +2904,6 @@ ProcXkbGetCompatMap(ClientPtr client)
         client->errorValue = _XkbErrCode2(0x05, compat->num_si);
         return BadValue;
     }
-    rep.nTotalSI = compat->num_si;
-    rep.groups = stuff->groups;
     XkbComputeGetCompatMapReplySize(compat, &rep);
     return XkbSendCompatMap(client, compat, &rep);
 }
@@ -3077,12 +3049,11 @@ _XkbSetCompatMap(ClientPtr client, DeviceIntPtr dev,
     }
 
     if (req->recomputeActions) {
-        XkbChangesRec change;
+        XkbChangesRec change = { 0 };
         unsigned check;
         XkbEventCauseRec cause;
 
         XkbSetCauseXkbReq(&cause, X_kbSetCompatMap, client);
-        memset(&change, 0, sizeof(XkbChangesRec));
         XkbUpdateActions(dev, xkb->min_key_code, XkbNumKeys(xkb), &change,
                          &check, &cause);
         if (check)
@@ -3158,7 +3129,6 @@ ProcXkbSetCompatMap(ClientPtr client)
 int
 ProcXkbGetIndicatorState(ClientPtr client)
 {
-    xkbGetIndicatorStateReply rep;
     XkbSrvLedInfoPtr sli;
     DeviceIntPtr dev;
 
@@ -3175,11 +3145,10 @@ ProcXkbGetIndicatorState(ClientPtr client)
     if (!sli)
         return BadAlloc;
 
-    rep = (xkbGetIndicatorStateReply) {
+    xkbGetIndicatorStateReply rep = {
         .type = X_Reply,
         .deviceID = dev->id,
         .sequenceNumber = client->sequence,
-        .length = 0,
         .state = sli->effectiveState
     };
 
@@ -3274,7 +3243,6 @@ XkbSendIndicatorMap(ClientPtr client,
 int
 ProcXkbGetIndicatorMap(ClientPtr client)
 {
-    xkbGetIndicatorMapReply rep;
     DeviceIntPtr dev;
     XkbDescPtr xkb;
     XkbIndicatorPtr leds;
@@ -3290,11 +3258,10 @@ ProcXkbGetIndicatorMap(ClientPtr client)
     xkb = dev->key->xkbInfo->desc;
     leds = xkb->indicators;
 
-    rep = (xkbGetIndicatorMapReply) {
+    xkbGetIndicatorMapReply rep = {
         .type = X_Reply,
         .deviceID = dev->id,
         .sequenceNumber = client->sequence,
-        .length = 0,
         .which = stuff->which
     };
     XkbComputeGetIndicatorMapReplySize(leds, &rep);
@@ -3417,7 +3384,6 @@ int
 ProcXkbGetNamedIndicator(ClientPtr client)
 {
     DeviceIntPtr dev;
-    xkbGetNamedIndicatorReply rep;
     register int i = 0;
     XkbSrvLedInfoPtr sli;
     XkbIndicatorMapPtr map = NULL;
@@ -3446,12 +3412,13 @@ ProcXkbGetNamedIndicator(ClientPtr client)
         }
     }
 
-    rep = (xkbGetNamedIndicatorReply) {
+    xkbGetNamedIndicatorReply rep = {
         .type = X_Reply,
         .sequenceNumber = client->sequence,
-        .length = 0,
         .deviceID = dev->id,
-        .indicator = stuff->indicator
+        .indicator = stuff->indicator,
+        .supported = TRUE,
+        .ndx = XkbNoIndicator,
     };
     if (map != NULL) {
         rep.found = TRUE;
@@ -3466,22 +3433,6 @@ ProcXkbGetNamedIndicator(ClientPtr client)
         rep.realMods = map->mods.real_mods;
         rep.virtualMods = map->mods.vmods;
         rep.ctrls = map->ctrls;
-        rep.supported = TRUE;
-    }
-    else {
-        rep.found = FALSE;
-        rep.on = FALSE;
-        rep.realIndicator = FALSE;
-        rep.ndx = XkbNoIndicator;
-        rep.flags = 0;
-        rep.whichGroups = 0;
-        rep.groups = 0;
-        rep.whichMods = 0;
-        rep.mods = 0;
-        rep.realMods = 0;
-        rep.virtualMods = 0;
-        rep.ctrls = 0;
-        rep.supported = TRUE;
     }
     if (client->swapped) {
         swapl(&rep.length);
@@ -3575,8 +3526,8 @@ _XkbSetNamedIndicator(ClientPtr client, DeviceIntPtr dev,
     XkbIndicatorMapPtr map;
     DeviceIntPtr kbd;
     XkbEventCauseRec cause;
-    xkbExtensionDeviceNotify ed;
-    XkbChangesRec changes;
+    xkbExtensionDeviceNotify ed = { 0 };
+    XkbChangesRec changes = { 0 };
     int rc;
 
     rc = _XkbCreateIndicatorMap(dev, stuff->indicator, stuff->ledClass,
@@ -3614,8 +3565,6 @@ _XkbSetNamedIndicator(ClientPtr client, DeviceIntPtr dev,
         statec |= ((sli->effectiveState ^ sli->explicitState) & (1 << led));
     }
 
-    memset((char *) &ed, 0, sizeof(xkbExtensionDeviceNotify));
-    memset((char *) &changes, 0, sizeof(XkbChangesRec));
     XkbSetCauseXkbReq(&cause, X_kbSetNamedIndicator, client);
     if (namec)
         XkbApplyLedNameChanges(dev, sli, namec, &ed, &changes, &cause);
@@ -4013,7 +3962,6 @@ ProcXkbGetNames(ClientPtr client)
 {
     DeviceIntPtr dev;
     XkbDescPtr xkb;
-    xkbGetNamesReply rep;
 
     REQUEST(xkbGetNamesReq);
     REQUEST_SIZE_MATCH(xkbGetNamesReq);
@@ -4025,11 +3973,11 @@ ProcXkbGetNames(ClientPtr client)
     CHK_MASK_LEGAL(0x01, stuff->which, XkbAllNamesMask);
 
     xkb = dev->key->xkbInfo->desc;
-    rep = (xkbGetNamesReply) {
+
+    xkbGetNamesReply rep = {
         .type = X_Reply,
         .deviceID = dev->id,
         .sequenceNumber = client->sequence,
-        .length = 0,
         .which = stuff->which,
         .nTypes = xkb->map->num_types,
         .firstKey = xkb->min_key_code,
@@ -5087,7 +5035,6 @@ int
 ProcXkbGetGeometry(ClientPtr client)
 {
     DeviceIntPtr dev;
-    xkbGetGeometryReply rep;
     XkbGeometryPtr geom;
     Bool shouldFree;
     Status status;
@@ -5102,11 +5049,11 @@ ProcXkbGetGeometry(ClientPtr client)
     CHK_ATOM_OR_NONE(stuff->name);
 
     geom = XkbLookupNamedGeometry(dev, stuff->name, &shouldFree);
-    rep = (xkbGetGeometryReply) {
+
+    xkbGetGeometryReply rep = {
         .type = X_Reply,
         .deviceID = dev->id,
         .sequenceNumber = client->sequence,
-        .length = 0
     };
     status = XkbComputeGetGeometryReplySize(geom, &rep, stuff->name);
     if (status != Success)
@@ -5609,22 +5556,23 @@ _XkbSetGeometry(ClientPtr client, DeviceIntPtr dev, xkbSetGeometryReq * stuff)
 {
     XkbDescPtr xkb;
     Bool new_name;
-    xkbNewKeyboardNotify nkn;
     XkbGeometryPtr geom, old;
-    XkbGeometrySizesRec sizes;
     Status status;
 
     xkb = dev->key->xkbInfo->desc;
     old = xkb->geom;
     xkb->geom = NULL;
 
-    sizes.which = XkbGeomAllMask;
-    sizes.num_properties = stuff->nProperties;
-    sizes.num_colors = stuff->nColors;
-    sizes.num_shapes = stuff->nShapes;
-    sizes.num_sections = stuff->nSections;
-    sizes.num_doodads = stuff->nDoodads;
-    sizes.num_key_aliases = stuff->nKeyAliases;
+    XkbGeometrySizesRec sizes = {
+        .which = XkbGeomAllMask,
+        .num_properties = stuff->nProperties,
+        .num_colors = stuff->nColors,
+        .num_shapes = stuff->nShapes,
+        .num_sections = stuff->nSections,
+        .num_doodads = stuff->nDoodads,
+        .num_key_aliases = stuff->nKeyAliases,
+    };
+
     if ((status = XkbAllocGeometry(xkb, &sizes)) != Success) {
         xkb->geom = old;
         return status;
@@ -5643,18 +5591,21 @@ _XkbSetGeometry(ClientPtr client, DeviceIntPtr dev, xkbSetGeometryReq * stuff)
     if (old)
         XkbFreeGeometry(old, XkbGeomAllMask, TRUE);
     if (new_name) {
-        xkbNamesNotify nn;
-
-        memset(&nn, 0, sizeof(xkbNamesNotify));
-        nn.changed = XkbGeometryNameMask;
+        xkbNamesNotify nn = {
+            .changed = XkbGeometryNameMask,
+        };
         XkbSendNamesNotify(dev, &nn);
     }
-    nkn.deviceID = nkn.oldDeviceID = dev->id;
-    nkn.minKeyCode = nkn.oldMinKeyCode = xkb->min_key_code;
-    nkn.maxKeyCode = nkn.oldMaxKeyCode = xkb->max_key_code;
-    nkn.requestMajor = XkbReqCode;
-    nkn.requestMinor = X_kbSetGeometry;
-    nkn.changed = XkbNKN_GeometryMask;
+
+    xkbNewKeyboardNotify nkn = {
+        .deviceID = nkn.oldDeviceID = dev->id,
+        .minKeyCode = nkn.oldMinKeyCode = xkb->min_key_code,
+        .maxKeyCode = nkn.oldMaxKeyCode = xkb->max_key_code,
+        .requestMajor = XkbReqCode,
+        .requestMinor = X_kbSetGeometry,
+        .changed = XkbNKN_GeometryMask,
+    };
+
     XkbSendNewKeyboardNotify(dev, &nkn);
     return Success;
 }
@@ -5700,7 +5651,6 @@ int
 ProcXkbPerClientFlags(ClientPtr client)
 {
     DeviceIntPtr dev;
-    xkbPerClientFlagsReply rep;
     XkbInterestPtr interest;
     Mask access_mode = DixGetAttrAccess | DixSetAttrAccess;
 
@@ -5751,10 +5701,9 @@ ProcXkbPerClientFlags(ClientPtr client)
         }
     }
 
-    rep = (xkbPerClientFlagsReply) {
+    xkbPerClientFlagsReply rep = {
         .type = X_Reply,
         .sequenceNumber = client->sequence,
-        .length = 0,
         .supported = XkbPCF_AllFlagsMask,
         .value = client->xkbClientFlags & XkbPCF_AllFlagsMask,
         .autoCtrls = interest ? interest->autoCtrls : 0,
@@ -5847,7 +5796,6 @@ int
 ProcXkbListComponents(ClientPtr client)
 {
     DeviceIntPtr dev;
-    xkbListComponentsReply rep;
     unsigned len;
     unsigned char *str;
     uint8_t size;
@@ -5877,29 +5825,15 @@ ProcXkbListComponents(ClientPtr client)
     }
     if ((XkbPaddedSize(len) / 4) != stuff->length)
         return BadLength;
-    rep = (xkbListComponentsReply) {
+
+    xkbListComponentsReply rep = {
         .type = X_Reply,
         .deviceID = dev->id,
         .sequenceNumber = client->sequence,
-        .length = 0,
-        .nKeymaps = 0,
-        .nKeycodes = 0,
-        .nTypes = 0,
-        .nCompatMaps = 0,
-        .nSymbols = 0,
-        .nGeometries = 0,
-        .extra = 0
     };
     if (client->swapped) {
         swaps(&rep.sequenceNumber);
         swapl(&rep.length);
-        swaps(&rep.nKeymaps);
-        swaps(&rep.nKeycodes);
-        swaps(&rep.nTypes);
-        swaps(&rep.nCompatMaps);
-        swaps(&rep.nSymbols);
-        swaps(&rep.nGeometries);
-        swaps(&rep.extra);
     }
     WriteToClient(client, SIZEOF(xkbListComponentsReply), &rep);
     return Success;
@@ -5912,17 +5846,15 @@ ProcXkbGetKbdByName(ClientPtr client)
     DeviceIntPtr dev;
     DeviceIntPtr tmpd;
     DeviceIntPtr master;
-    xkbGetKbdByNameReply rep = { 0 };
     xkbGetMapReply mrep = { 0 };
     xkbGetCompatMapReply crep = { 0 };
     xkbGetIndicatorMapReply irep = { 0 };
     xkbGetNamesReply nrep = { 0 };
     xkbGetGeometryReply grep = { 0 };
-    XkbComponentNamesRec names = { 0 };
     XkbDescPtr xkb, new;
     XkbEventCauseRec cause;
     unsigned char *str;
-    char mapFile[PATH_MAX];
+    char mapFile[PATH_MAX] = { 0 };
     unsigned len;
     unsigned fwant, fneed, reported;
     int status;
@@ -5950,11 +5882,15 @@ ProcXkbGetKbdByName(ClientPtr client)
             return BadMatch;
         }
     }
-    names.keycodes = GetComponentSpec(client, stuff, &str, TRUE, &status);
-    names.types = GetComponentSpec(client, stuff, &str, TRUE, &status);
-    names.compat = GetComponentSpec(client, stuff, &str, TRUE, &status);
-    names.symbols = GetComponentSpec(client, stuff, &str, TRUE, &status);
-    names.geometry = GetComponentSpec(client, stuff, &str, TRUE, &status);
+
+    XkbComponentNamesRec names = {
+        .keycodes = GetComponentSpec(client, stuff, &str, TRUE, &status),
+        .types = GetComponentSpec(client, stuff, &str, TRUE, &status),
+        .compat = GetComponentSpec(client, stuff, &str, TRUE, &status),
+        .symbols = GetComponentSpec(client, stuff, &str, TRUE, &status),
+        .geometry = GetComponentSpec(client, stuff, &str, TRUE, &status),
+    };
+
     if (status == Success) {
         len = str - ((unsigned char *) stuff);
         if ((XkbPaddedSize(len) / 4) != stuff->length)
@@ -5994,18 +5930,10 @@ ProcXkbGetKbdByName(ClientPtr client)
         geom_changed = FALSE;
     }
 
-    memset(mapFile, 0, PATH_MAX);
-    rep.type = X_Reply;
-    rep.deviceID = dev->id;
-    rep.sequenceNumber = client->sequence;
-    rep.length = 0;
-    rep.minKeyCode = xkb->min_key_code;
-    rep.maxKeyCode = xkb->max_key_code;
-    rep.loaded = FALSE;
     fwant =
         XkbConvertGetByNameComponents(TRUE, stuff->want) | XkmVirtualModsMask;
     fneed = XkbConvertGetByNameComponents(TRUE, stuff->need);
-    rep.reported = XkbConvertGetByNameComponents(FALSE, fwant | fneed);
+
     if (stuff->load) {
         fneed |= XkmKeymapRequired;
         fwant |= XkmKeymapLegal;
@@ -6015,11 +5943,17 @@ ProcXkbGetKbdByName(ClientPtr client)
         fwant |= XkmIndicatorsIndex;
     }
 
-    /* We pass dev in here so we can get the old names out if needed. */
-    rep.found = XkbDDXLoadKeymapByNames(dev, &names, fwant, fneed, &new,
-                                        mapFile, PATH_MAX);
-    rep.newKeyboard = FALSE;
-    rep.pad1 = rep.pad2 = rep.pad3 = rep.pad4 = 0;
+    xkbGetKbdByNameReply rep = { 
+        .type = X_Reply,
+        .deviceID = dev->id,
+        .sequenceNumber = client->sequence,
+        .minKeyCode = xkb->min_key_code,
+        .maxKeyCode = xkb->max_key_code,
+        .reported = XkbConvertGetByNameComponents(FALSE, fwant | fneed),
+        /* We pass dev in here so we can get the old names out if needed. */
+        .found = XkbDDXLoadKeymapByNames(dev, &names, fwant, fneed, &new,
+                                         mapFile, PATH_MAX),
+    };
 
     stuff->want |= stuff->need;
     if (new == NULL)
@@ -6029,9 +5963,7 @@ ProcXkbGetKbdByName(ClientPtr client)
             rep.loaded = TRUE;
         if (stuff->load ||
             ((rep.reported & XkbGBN_SymbolsMask) && (new->compat))) {
-            XkbChangesRec changes;
-
-            memset(&changes, 0, sizeof(changes));
+            XkbChangesRec changes = { 0 };
             XkbUpdateDescActions(new,
                                  new->min_key_code, XkbNumKeys(new), &changes);
         }
@@ -6046,27 +5978,17 @@ ProcXkbGetKbdByName(ClientPtr client)
                 ((SIZEOF(xkbGetMapReply) - SIZEOF(xGenericReply)) >> 2);
             mrep.minKeyCode = new->min_key_code;
             mrep.maxKeyCode = new->max_key_code;
-            mrep.present = 0;
             mrep.totalSyms = mrep.totalActs =
                 mrep.totalKeyBehaviors = mrep.totalKeyExplicit =
                 mrep.totalModMapKeys = mrep.totalVModMapKeys = 0;
             if (rep.reported & (XkbGBN_TypesMask | XkbGBN_ClientSymbolsMask)) {
                 mrep.present |= XkbKeyTypesMask;
-                mrep.firstType = 0;
                 mrep.nTypes = mrep.totalTypes = new->map->num_types;
-            }
-            else {
-                mrep.firstType = mrep.nTypes = 0;
-                mrep.totalTypes = 0;
             }
             if (rep.reported & XkbGBN_ClientSymbolsMask) {
                 mrep.present |= (XkbKeySymsMask | XkbModifierMapMask);
                 mrep.firstKeySym = mrep.firstModMapKey = new->min_key_code;
                 mrep.nKeySyms = mrep.nModMapKeys = XkbNumKeys(new);
-            }
-            else {
-                mrep.firstKeySym = mrep.firstModMapKey = 0;
-                mrep.nKeySyms = mrep.nModMapKeys = 0;
             }
             if (rep.reported & XkbGBN_ServerSymbolsMask) {
                 mrep.present |= XkbAllServerInfoMask;
@@ -6078,12 +6000,6 @@ ProcXkbGetKbdByName(ClientPtr client)
                 mrep.firstVModMapKey = new->min_key_code;
                 mrep.nVModMapKeys = XkbNumKeys(new);
             }
-            else {
-                mrep.virtualMods = 0;
-                mrep.firstKeyAct = mrep.firstKeyBehavior =
-                    mrep.firstKeyExplicit = 0;
-                mrep.nKeyActs = mrep.nKeyBehaviors = mrep.nKeyExplicit = 0;
-            }
             XkbComputeGetMapReplySize(new, &mrep);
             rep.length += SIZEOF(xGenericReply) / 4 + mrep.length;
         }
@@ -6093,9 +6009,7 @@ ProcXkbGetKbdByName(ClientPtr client)
             crep.type = X_Reply;
             crep.deviceID = dev->id;
             crep.sequenceNumber = client->sequence;
-            crep.length = 0;
             crep.groups = XkbAllGroupsMask;
-            crep.firstSI = 0;
             crep.nSI = crep.nTotalSI = new->compat->num_si;
             XkbComputeGetCompatMapReplySize(new->compat, &crep);
             rep.length += SIZEOF(xGenericReply) / 4 + crep.length;
@@ -6106,7 +6020,6 @@ ProcXkbGetKbdByName(ClientPtr client)
             irep.type = X_Reply;
             irep.deviceID = dev->id;
             irep.sequenceNumber = client->sequence;
-            irep.length = 0;
             irep.which = XkbAllIndicatorsMask;
             XkbComputeGetIndicatorMapReplySize(new->indicators, &irep);
             rep.length += SIZEOF(xGenericReply) / 4 + irep.length;
@@ -6117,29 +6030,16 @@ ProcXkbGetKbdByName(ClientPtr client)
             nrep.type = X_Reply;
             nrep.deviceID = dev->id;
             nrep.sequenceNumber = client->sequence;
-            nrep.length = 0;
             nrep.minKeyCode = new->min_key_code;
             nrep.maxKeyCode = new->max_key_code;
             if (rep.reported & XkbGBN_OtherNamesMask) {
                 nrep.which = XkbAllNamesMask;
                 if (new->map != NULL)
                     nrep.nTypes = new->map->num_types;
-                else
-                    nrep.nTypes = 0;
-                nrep.nKTLevels = 0;
                 nrep.groupNames = XkbAllGroupsMask;
                 nrep.virtualMods = XkbAllVirtualModsMask;
                 nrep.indicators = XkbAllIndicatorsMask;
                 nrep.nRadioGroups = new->names->num_rg;
-            }
-            else {
-                nrep.which = 0;
-                nrep.nTypes = 0;
-                nrep.nKTLevels = 0;
-                nrep.groupNames = 0;
-                nrep.virtualMods = 0;
-                nrep.indicators = 0;
-                nrep.nRadioGroups = 0;
             }
             if (rep.reported & XkbGBN_KeyNamesMask) {
                 nrep.which |= XkbKeyNamesMask;
@@ -6151,8 +6051,6 @@ ProcXkbGetKbdByName(ClientPtr client)
             }
             else {
                 nrep.which &= ~(XkbKeyNamesMask | XkbKeyAliasesMask);
-                nrep.firstKey = nrep.nKeys = 0;
-                nrep.nKeyAliases = 0;
             }
             XkbComputeGetNamesReplySize(new, &nrep);
             rep.length += SIZEOF(xGenericReply) / 4 + nrep.length;
@@ -6163,13 +6061,7 @@ ProcXkbGetKbdByName(ClientPtr client)
             grep.type = X_Reply;
             grep.deviceID = dev->id;
             grep.sequenceNumber = client->sequence;
-            grep.length = 0;
             grep.found = TRUE;
-            grep.pad = 0;
-            grep.widthMM = grep.heightMM = 0;
-            grep.nProperties = grep.nColors = grep.nShapes = 0;
-            grep.nSections = grep.nDoodads = 0;
-            grep.baseColorNdx = grep.labelColorNdx = 0;
             XkbComputeGetGeometryReplySize(new->geom, &grep, None);
             rep.length += SIZEOF(xGenericReply) / 4 + grep.length;
         }
@@ -6195,7 +6087,6 @@ ProcXkbGetKbdByName(ClientPtr client)
         XkbSendGeometry(client, new->geom, &grep);
     if (rep.loaded) {
         XkbDescPtr old_xkb;
-        xkbNewKeyboardNotify nkn;
 
         old_xkb = xkb;
         xkb = new;
@@ -6204,14 +6095,16 @@ ProcXkbGetKbdByName(ClientPtr client)
 
         XkbCopyControls(xkb, old_xkb);
 
-        nkn.deviceID = nkn.oldDeviceID = dev->id;
-        nkn.minKeyCode = new->min_key_code;
-        nkn.maxKeyCode = new->max_key_code;
-        nkn.oldMinKeyCode = xkb->min_key_code;
-        nkn.oldMaxKeyCode = xkb->max_key_code;
-        nkn.requestMajor = XkbReqCode;
-        nkn.requestMinor = X_kbGetKbdByName;
-        nkn.changed = XkbNKN_KeycodesMask;
+        xkbNewKeyboardNotify nkn = {
+            .deviceID = nkn.oldDeviceID = dev->id,
+            .minKeyCode = new->min_key_code,
+            .maxKeyCode = new->max_key_code,
+            .oldMinKeyCode = xkb->min_key_code,
+            .oldMaxKeyCode = xkb->max_key_code,
+            .requestMajor = XkbReqCode,
+            .requestMinor = X_kbGetKbdByName,
+            .changed = XkbNKN_KeycodesMask,
+        };
         if (geom_changed)
             nkn.changed |= XkbNKN_GeometryMask;
         XkbSendNewKeyboardNotify(dev, &nkn);
@@ -6257,12 +6150,12 @@ static int
 ComputeDeviceLedInfoSize(DeviceIntPtr dev,
                          unsigned int what, XkbSrvLedInfoPtr sli)
 {
-    int nNames, nMaps;
+    int nNames = 0, nMaps = 0;
     register unsigned n, bit;
 
     if (sli == NULL)
         return 0;
-    nNames = nMaps = 0;
+
     if ((what & XkbXI_IndicatorNamesMask) == 0)
         sli->namesPresent = 0;
     if ((what & XkbXI_IndicatorMapsMask) == 0)
@@ -6288,7 +6181,7 @@ CheckDeviceLedFBs(DeviceIntPtr dev,
 {
     int nFBs = 0;
     int length = 0;
-    Bool classOk;
+    Bool classOk = FALSE;
 
     if (class == XkbDfltXIClass) {
         if (dev->kbdfeed)
@@ -6300,7 +6193,7 @@ CheckDeviceLedFBs(DeviceIntPtr dev,
             return XkbKeyboardErrorCode;
         }
     }
-    classOk = FALSE;
+
     if ((dev->kbdfeed) &&
         ((class == KbdFeedbackClass) || (class == XkbAllXIClasses))) {
         KbdFeedbackPtr kf;
@@ -6352,16 +6245,16 @@ CheckDeviceLedFBs(DeviceIntPtr dev,
 static int
 SendDeviceLedInfo(XkbSrvLedInfoPtr sli, ClientPtr client)
 {
-    xkbDeviceLedsWireDesc wire;
-    int length;
+    int length = 0;
+    xkbDeviceLedsWireDesc wire = {
+        .ledClass = sli->class,
+        .ledID = sli->id,
+        .namesPresent = sli->namesPresent,
+        .mapsPresent = sli->mapsPresent,
+        .physIndicators = sli->physIndicators,
+        .state = sli->effectiveState,
+    };
 
-    length = 0;
-    wire.ledClass = sli->class;
-    wire.ledID = sli->id;
-    wire.namesPresent = sli->namesPresent;
-    wire.mapsPresent = sli->mapsPresent;
-    wire.physIndicators = sli->physIndicators;
-    wire.state = sli->effectiveState;
     if (client->swapped) {
         swaps(&wire.ledClass);
         swaps(&wire.ledID);
@@ -6391,24 +6284,25 @@ SendDeviceLedInfo(XkbSrvLedInfoPtr sli, ClientPtr client)
         }
         if (sli->mapsPresent) {
             for (i = 0, bit = 1; i < XkbNumIndicators; i++, bit <<= 1) {
-                xkbIndicatorMapWireDesc iwire;
-
                 if (sli->mapsPresent & bit) {
-                    iwire.flags = sli->maps[i].flags;
-                    iwire.whichGroups = sli->maps[i].which_groups;
-                    iwire.groups = sli->maps[i].groups;
-                    iwire.whichMods = sli->maps[i].which_mods;
-                    iwire.mods = sli->maps[i].mods.mask;
-                    iwire.realMods = sli->maps[i].mods.real_mods;
-                    iwire.virtualMods = sli->maps[i].mods.vmods;
-                    iwire.ctrls = sli->maps[i].ctrls;
+                    xkbIndicatorMapWireDesc iwire = {
+                        .flags = sli->maps[i].flags,
+                        .whichGroups = sli->maps[i].which_groups,
+                        .groups = sli->maps[i].groups,
+                        .whichMods = sli->maps[i].which_mods,
+                        .mods = sli->maps[i].mods.mask,
+                        .realMods = sli->maps[i].mods.real_mods,
+                        .virtualMods = sli->maps[i].mods.vmods,
+                        .ctrls = sli->maps[i].ctrls,
+                    };
+
                     if (client->swapped) {
                         swaps(&iwire.virtualMods);
                         swapl(&iwire.ctrls);
                     }
                     WriteToClient(client, SIZEOF(xkbIndicatorMapWireDesc),
                                   &iwire);
-                    length += SIZEOF(xkbIndicatorMapWireDesc);
+                    length += sizeof(xkbIndicatorMapWireDesc);
                 }
             }
         }
@@ -6464,7 +6358,6 @@ int
 ProcXkbGetDeviceInfo(ClientPtr client)
 {
     DeviceIntPtr dev;
-    xkbGetDeviceInfoReply rep;
     int status, nDeviceLedFBs;
     unsigned length, nameLen;
     CARD16 ledClass, ledID;
@@ -6488,19 +6381,14 @@ ProcXkbGetDeviceInfo(ClientPtr client)
         wanted &= ~XkbXI_IndicatorsMask;
 
     nameLen = XkbSizeCountedString(dev->name);
-    rep = (xkbGetDeviceInfoReply) {
+
+    xkbGetDeviceInfoReply rep = {
         .type = X_Reply,
         .deviceID = dev->id,
         .sequenceNumber = client->sequence,
-        .length = nameLen / 4,
+        .length = bytes_to_int32(nameLen),
         .present = wanted,
         .supported = XkbXI_AllDeviceFeaturesMask,
-        .unsupported = 0,
-        .nDeviceLedFBs = 0,
-        .firstBtnWanted = 0,
-        .nBtnsWanted = 0,
-        .firstBtnRtrn = 0,
-        .nBtnsRtrn = 0,
         .totalBtns = dev->button ? dev->button->numButtons : 0,
         .hasOwnState = (dev->key && dev->key->xkbInfo),
         .dfltKbdFB = dev->kbdfeed ? dev->kbdfeed->ctrl.id : XkbXINone,
@@ -6829,9 +6717,8 @@ _XkbSetDeviceInfo(ClientPtr client, DeviceIntPtr dev,
                   xkbSetDeviceInfoReq * stuff)
 {
     char *wire;
-    xkbExtensionDeviceNotify ed;
+    xkbExtensionDeviceNotify ed = { 0 };
 
-    memset((char *) &ed, 0, SIZEOF(xkbExtensionDeviceNotify));
     ed.deviceID = dev->id;
     wire = (char *) &stuff[1];
     if (stuff->change & XkbXI_ButtonActionsMask) {
@@ -6952,7 +6839,6 @@ int
 ProcXkbSetDebuggingFlags(ClientPtr client)
 {
     CARD32 newFlags, newCtrls, extraLength;
-    xkbSetDebuggingFlagsReply rep;
     int rc;
 
     REQUEST(xkbSetDebuggingFlagsReq);
@@ -6994,10 +6880,9 @@ ProcXkbSetDebuggingFlags(ClientPtr client)
     xkbDebugFlags = newFlags;
     xkbDebugCtrls = newCtrls;
 
-    rep = (xkbSetDebuggingFlagsReply) {
+    xkbSetDebuggingFlagsReply rep = {
         .type = X_Reply,
         .sequenceNumber = client->sequence,
-        .length = 0,
         .currentFlags = newFlags,
         .currentCtrls = newCtrls,
         .supportedFlags = ~0,
