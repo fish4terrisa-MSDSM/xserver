@@ -37,6 +37,7 @@
 #include <X11/Xmd.h>
 
 #include "dix/dix_priv.h"
+#include "os/access.h"
 #include "os/auth.h"
 
 #include "misc.h"

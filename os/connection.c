@@ -97,6 +97,7 @@ SOFTWARE.
 #endif                          /* WIN32 */
 
 #include "dix/dix_priv.h"
+#include "os/access.h"
 #include "os/audit.h"
 #include "os/auth.h"
 #include "os/osdep.h"
