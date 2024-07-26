@@ -266,7 +266,7 @@ LockServer(void)
     int len;
     char port[20];
 
-    if (nolock || NoListenAll)
+    if (nolock || NoListenAll || (displayfd != -1 && !explicit_display))
         return;
     /*
      * Path names
@@ -393,7 +393,7 @@ LockServer(void)
 void
 UnlockServer(void)
 {
-    if (nolock || NoListenAll)
+    if (nolock || NoListenAll || (displayfd != -1 && !explicit_display))
         return;
 
     if (!StillLocking) {
@@ -766,9 +766,6 @@ ProcessCommandLine(int argc, char *argv[])
         else if (strcmp(argv[i], "-displayfd") == 0) {
             if (++i < argc) {
                 displayfd = atoi(argv[i]);
-#ifdef LOCK_SERVER
-                nolock = TRUE;
-#endif
             }
             else
                 UseMsg();
