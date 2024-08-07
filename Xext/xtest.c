@@ -538,12 +538,6 @@ SProcXTestFakeInput(ClientPtr client)
 }
 
 static int _X_COLD
-SProcXTestGrabControl(ClientPtr client)
-{
-    return ProcXTestGrabControl(client);
-}
-
-static int _X_COLD
 SProcXTestDispatch(ClientPtr client)
 {
     REQUEST(xReq);
@@ -555,7 +549,7 @@ SProcXTestDispatch(ClientPtr client)
     case X_XTestFakeInput:
         return SProcXTestFakeInput(client);
     case X_XTestGrabControl:
-        return SProcXTestGrabControl(client);
+        return ProcXTestGrabControl(client);
     default:
         return BadRequest;
     }
