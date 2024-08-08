@@ -1118,7 +1118,7 @@ DoGetFBConfigs(__GLXclientState * cl, unsigned screen)
             WRITE_PAIR(GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, modes->sRGBCapable);
         }
         /* Pad the remaining place with zeroes, so that attributes count is constant. */
-        while (p < __GLX_FBCONFIG_ATTRIBS_LENGTH) {
+        while (p < __GLX_FBCONFIG_ATTRIBS_LENGTH - 1) {
             WRITE_PAIR(0, 0);
         }
         assert(p == __GLX_FBCONFIG_ATTRIBS_LENGTH);
