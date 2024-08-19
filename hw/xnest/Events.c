@@ -30,7 +30,6 @@ is" without express or implied warranty.
 #include "inpututils.h"
 #include "mi.h"
 
-#include "Xnest.h"
 #include "xnest-xcb.h"
 
 #include "Args.h"
