@@ -86,10 +86,6 @@ SOFTWARE.
 
 #include <stdio.h>
 #include <stdlib.h>
-#define XSERV_t
-#define TRANS_SERVER
-#define TRANS_REOPEN
-#include <X11/Xtrans/Xtrans.h>
 #include <X11/Xauth.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
@@ -185,6 +181,7 @@ SOFTWARE.
 #define X_INCLUDE_NETDB_H
 #include <X11/Xos_r.h>
 
+#include "os/access.h"
 #include "os/auth.h"
 
 #include "dixstruct.h"
@@ -214,11 +211,11 @@ static Bool NewHost(int /*family */ ,
                     int /* addingLocalHosts */ );
 
 /* XFree86 bug #156: To keep track of which hosts were explicitly requested in
-   /etc/X<display>.hosts, we've added a requested field to the HOST struct,
-   and a LocalHostRequested variable.  These default to FALSE, but are set
-   to TRUE in ResetHosts when reading in /etc/X<display>.hosts.  They are
-   checked in DisableLocalHost(), which is called to disable the default
-   local host entries when stronger authentication is turned on. */
+   /etc/X<display>.hosts, we've added a requested field to the HOST struct.
+   This defaults to FALSE, but is set to TRUE in ResetHosts when reading in
+   /etc/X<display>.hosts.  It is checked in DisableLocalHost(), which is called
+   to disable the default local host entries when stronger authentication is
+   turned on. */
 
 typedef struct _host {
     short family;
@@ -237,8 +234,6 @@ typedef struct _host {
 static HOST *selfhosts = NULL;
 static HOST *validhosts = NULL;
 static int AccessEnabled = TRUE;
-static int LocalHostEnabled = FALSE;
-static int LocalHostRequested = FALSE;
 static int UsingXdmcp = FALSE;
 
 static enum {
@@ -284,10 +279,8 @@ EnableLocalAccess(void)
 
 static void EnableLocalHost(void)
 {
-    if (!UsingXdmcp) {
-        LocalHostEnabled = TRUE;
+    if (!UsingXdmcp)
         AddLocalHosts();
-    }
 }
 
 /*
@@ -311,9 +304,6 @@ DisableLocalAccess(void)
 static void DisableLocalHost(void)
 {
     HOST *self;
-
-    if (!LocalHostRequested)    /* Fix for XFree86 bug #156 */
-        LocalHostEnabled = FALSE;
     for (self = selfhosts; self; self = self->next) {
         if (!self->requested)   /* Fix for XFree86 bug #156 */
             (void) RemoveHost((ClientPtr) NULL, self->family, self->len,
@@ -396,7 +386,6 @@ void
 AccessUsingXdmcp(void)
 {
     UsingXdmcp = TRUE;
-    LocalHostEnabled = FALSE;
 }
 
 #if  defined(SVR4) && !defined(__sun)  && defined(SIOCGIFCONF) && !defined(USE_SIOCGLIFCONF)
@@ -440,7 +429,7 @@ ifioctl(int fd, int cmd, char *arg)
 
 #if !defined(SIOCGIFCONF)
 void
-DefineSelf(int fd)
+DefineSelf(struct _XtransConnInfo *ci)
 {
 #if !defined(TCPCONN) && !defined(UNIXCONN)
     return;
@@ -470,6 +459,25 @@ DefineSelf(int fd)
     _Xgethostbynameparams hparams;
 #endif
 
+    if (_XSERVTransIsLocal(ci)) {
+        /*
+         * add something of FamilyLocalHost
+         */
+        for (host = selfhosts;
+             host && !addrEqual(FamilyLocalHost, "", 0, host); host = host->next);
+        if (!host) {
+            MakeHost(host, 0);
+            if (host) {
+                host->family = FamilyLocalHost;
+                host->len = 0;
+                /* Nothing to store in host->addr */
+                host->next = selfhosts;
+                selfhosts = host;
+            }
+        }
+        return;
+    }
+
     /* Why not use gethostname()?  Well, at least on my system, I've had to
      * make an ugly kernel patch to get a name longer than 8 characters, and
      * uname() lets me access to the whole string (it smashes release, you
@@ -479,6 +487,8 @@ DefineSelf(int fd)
 
     hp = _XGethostbyname(name.nodename, hparams);
     if (hp != NULL) {
+        if (hp->h_addrtype != ci->family)
+            return;
         saddr.sa.sa_family = hp->h_addrtype;
         switch (hp->h_addrtype) {
         case AF_INET:
@@ -494,7 +504,7 @@ DefineSelf(int fd)
             break;
 #endif
         default:
-            goto DefineLocalHost;
+            return;
         }
         family = ConvertAddr(&(saddr.sa), &len, (void **) &addr);
         if (family != -1 && family != FamilyLocal) {
@@ -505,12 +515,12 @@ DefineSelf(int fd)
                 /* add this host to the host list.      */
                 MakeHost(host, len)
                     if (host) {
-                    host->family = family;
-                    host->len = len;
-                    memcpy(host->addr, addr, len);
-                    host->next = selfhosts;
-                    selfhosts = host;
-                }
+                        host->family = family;
+                        host->len = len;
+                        memcpy(host->addr, addr, len);
+                        host->next = selfhosts;
+                        selfhosts = host;
+                    }
 #ifdef XDMCP
                 /*
                  *  If this is an Internet Address, but not the localhost
@@ -539,22 +549,6 @@ DefineSelf(int fd)
 
 #endif                          /* XDMCP */
             }
-        }
-    }
-    /*
-     * now add a host of family FamilyLocalHost...
-     */
- DefineLocalHost:
-    for (host = selfhosts;
-         host && !addrEqual(FamilyLocalHost, "", 0, host); host = host->next);
-    if (!host) {
-        MakeHost(host, 0);
-        if (host) {
-            host->family = FamilyLocalHost;
-            host->len = 0;
-            /* Nothing to store in host->addr */
-            host->next = selfhosts;
-            selfhosts = host;
         }
     }
 #endif                          /* !TCPCONN && !UNIXCONN */
@@ -593,7 +587,7 @@ in6_fillscopeid(struct sockaddr_in6 *sin6)
 #endif
 
 void
-DefineSelf(int fd)
+DefineSelf(struct _XtransConnInfo *ci)
 {
 #ifndef HAVE_GETIFADDRS
     char *cp, *cplim;
@@ -619,6 +613,24 @@ DefineSelf(int fd)
     unsigned char *addr;
     int family;
     register HOST *host;
+    if (_XSERVTransIsLocal(ci)) {
+        /*
+         * add something of FamilyLocalHost
+         */
+        for (host = selfhosts;
+             host && !addrEqual(FamilyLocalHost, "", 0, host); host = host->next);
+        if (!host) {
+            MakeHost(host, 0);
+            if (host) {
+                host->family = FamilyLocalHost;
+                host->len = 0;
+                /* Nothing to store in host->addr */
+                host->next = selfhosts;
+                selfhosts = host;
+            }
+        }
+        return;
+    }
 
 #ifndef HAVE_GETIFADDRS
 
@@ -627,7 +639,7 @@ DefineSelf(int fd)
 #ifdef USE_SIOCGLIFCONF
 
 #ifdef SIOCGLIFNUM
-    ifn.lifn_family = AF_UNSPEC;
+    ifn.lifn_family = ci->family;
     ifn.lifn_flags = 0;
     if (ioctl(fd, SIOCGLIFNUM, (char *) &ifn) < 0)
         ErrorF("Getting interface count: %s\n", strerror(errno));
@@ -637,7 +649,7 @@ DefineSelf(int fd)
     }
 #endif
 
-    ifc.lifc_family = AF_UNSPEC;
+    ifc.lifc_family = ci->family;
     ifc.lifc_flags = 0;
     ifc.lifc_len = len;
     ifc.lifc_buf = bufptr;
@@ -659,7 +671,7 @@ DefineSelf(int fd)
 #define IFR_IFR_NAME ifr->ifr_name
 #endif
 
-    if (ifioctl(fd, IFC_IOCTL_REQ, (void *) &ifc) < 0)
+    if (ifioctl(ci->fd, IFC_IOCTL_REQ, (void *) &ifc) < 0)
         ErrorF("Getting interface configuration (4): %s\n", strerror(errno));
 
     cplim = (char *) IFC_IFC_REQ + IFC_IFC_LEN;
@@ -744,12 +756,12 @@ DefineSelf(int fd)
                 struct lifreq broad_req;
 
                 broad_req = *ifr;
-                if (ioctl(fd, SIOCGLIFFLAGS, (char *) &broad_req) != -1 &&
+                if (ioctl(ci->fd, SIOCGLIFFLAGS, (char *) &broad_req) != -1 &&
                     (broad_req.lifr_flags & IFF_BROADCAST) &&
                     (broad_req.lifr_flags & IFF_UP)
                     ) {
                     broad_req = *ifr;
-                    if (ioctl(fd, SIOCGLIFBRDADDR, &broad_req) != -1)
+                    if (ioctl(ci->fd, SIOCGLIFBRDADDR, &broad_req) != -1)
                         broad_addr = broad_req.lifr_broadaddr;
                     else
                         continue;
@@ -763,12 +775,12 @@ DefineSelf(int fd)
                 struct ifreq broad_req;
 
                 broad_req = *ifr;
-                if (ifioctl(fd, SIOCGIFFLAGS, (void *) &broad_req) != -1 &&
+                if (ifioctl(ci->fd, SIOCGIFFLAGS, (void *) &broad_req) != -1 &&
                     (broad_req.ifr_flags & IFF_BROADCAST) &&
                     (broad_req.ifr_flags & IFF_UP)
                     ) {
                     broad_req = *ifr;
-                    if (ifioctl(fd, SIOCGIFBRDADDR, (void *) &broad_req) != -1)
+                    if (ifioctl(ci->fd, SIOCGIFBRDADDR, (void *) &broad_req) != -1)
                         broad_addr = broad_req.ifr_addr;
                     else
                         continue;
@@ -789,7 +801,8 @@ DefineSelf(int fd)
         return;
     }
     for (ifr = ifap; ifr != NULL; ifr = ifr->ifa_next) {
-        if (!ifr->ifa_addr)
+        if (!ifr->ifa_addr
+            || ifr->ifa_addr->sa_family != ci->family)
             continue;
         len = sizeof(*(ifr->ifa_addr));
         family = ConvertAddr((struct sockaddr *) ifr->ifa_addr, &len,
@@ -868,22 +881,6 @@ DefineSelf(int fd)
     }                           /* for */
     freeifaddrs(ifap);
 #endif                          /* HAVE_GETIFADDRS */
-
-    /*
-     * add something of FamilyLocalHost
-     */
-    for (host = selfhosts;
-         host && !addrEqual(FamilyLocalHost, "", 0, host); host = host->next);
-    if (!host) {
-        MakeHost(host, 0);
-        if (host) {
-            host->family = FamilyLocalHost;
-            host->len = 0;
-            /* Nothing to store in host->addr */
-            host->next = selfhosts;
-            selfhosts = host;
-        }
-    }
 }
 #endif                          /* hpux && !HAVE_IFREQ */
 
@@ -951,7 +948,6 @@ ResetHosts(const char *display)
 
     siTypesInitialize();
     AccessEnabled = !defeatAccessControl;
-    LocalHostEnabled = FALSE;
     while ((host = validhosts) != 0) {
         validhosts = host->next;
         FreeHost(host);
@@ -984,7 +980,6 @@ ResetHosts(const char *display)
             if (!strncmp("local:", lhostname, 6)) {
                 family = FamilyLocalHost;
                 NewHost(family, "", 0, FALSE);
-                LocalHostRequested = TRUE;      /* Fix for XFree86 bug #156 */
             }
 #if defined(TCPCONN)
             else if (!strncmp("inet:", lhostname, 5)) {
@@ -1321,7 +1316,6 @@ AddHost(ClientPtr client, int family, unsigned length,  /* of bytes in pAddr */
     switch (family) {
     case FamilyLocalHost:
         len = length;
-        LocalHostEnabled = TRUE;
         break;
     case FamilyInternet:
 #if defined(IPv6)
@@ -1404,7 +1398,6 @@ RemoveHost(ClientPtr client, int family, unsigned length,       /* of bytes in p
     switch (family) {
     case FamilyLocalHost:
         len = length;
-        LocalHostEnabled = FALSE;
         break;
     case FamilyInternet:
 #if defined(IPv6)
@@ -1525,21 +1518,17 @@ InvalidHost(register struct sockaddr *saddr, int len, ClientPtr client)
     if (family == -1)
         return 1;
     if (family == FamilyLocal) {
-        if (!LocalHostEnabled) {
-            /*
-             * check to see if any local address is enabled.  This
-             * implicitly enables local connections.
-             */
-            for (selfhost = selfhosts; selfhost; selfhost = selfhost->next) {
-                for (host = validhosts; host; host = host->next) {
-                    if (addrEqual(selfhost->family, selfhost->addr,
-                                  selfhost->len, host))
-                        return 0;
-                }
+        /*
+         * check to see if any local address is enabled.  This
+         * implicitly enables local connections.
+         */
+        for (selfhost = selfhosts; selfhost; selfhost = selfhost->next) {
+            for (host = validhosts; host; host = host->next) {
+                if (addrEqual(selfhost->family, selfhost->addr,
+                              selfhost->len, host))
+                    return 0;
             }
         }
-        else
-            return 0;
     }
     for (host = validhosts; host; host = host->next) {
         if (host->family == FamilyServerInterpreted) {

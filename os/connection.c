@@ -97,6 +97,7 @@ SOFTWARE.
 #endif                          /* WIN32 */
 
 #include "dix/dix_priv.h"
+#include "os/access.h"
 #include "os/audit.h"
 #include "os/auth.h"
 #include "os/osdep.h"
@@ -277,11 +278,9 @@ CreateWellKnownSockets(void)
     for (i = 0; i < ListenTransCount; i++) {
         int fd = _XSERVTransGetConnectionNumber(ListenTransConns[i]);
 
+        DefineSelf(ListenTransConns[i]);
         ListenTransFds[i] = fd;
         SetNotifyFd(fd, EstablishNewConnections, X_NOTIFY_READ, NULL);
-
-        if (!_XSERVTransIsLocal(ListenTransConns[i]))
-            DefineSelf (fd);
     }
 
     if (ListenTransCount == 0 && !NoListenAll)

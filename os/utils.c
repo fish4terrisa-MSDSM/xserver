@@ -74,10 +74,6 @@ __stdcall unsigned long GetTickCount(void);
 #endif
 #include "misc.h"
 #include <X11/X.h>
-#define XSERV_t
-#define TRANS_SERVER
-#define TRANS_REOPEN
-#include <X11/Xtrans/Xtrans.h>
 
 #include "os/audit.h"
 
@@ -106,6 +102,7 @@ __stdcall unsigned long GetTickCount(void);
 #endif
 
 #include "dix/dix_priv.h"
+#include "os/access.h"
 #include "os/auth.h"
 #include "os/cmdline.h"
 #include "os/ddx_priv.h"
