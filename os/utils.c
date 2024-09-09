@@ -77,8 +77,6 @@ __stdcall unsigned long GetTickCount(void);
 #define TRANS_REOPEN
 #include <X11/Xtrans/Xtrans.h>
 
-#include "os/audit.h"
-
 #include "input.h"
 #include "dixfont.h"
 #include <X11/fonts/libxfont2.h>
@@ -105,9 +103,11 @@ __stdcall unsigned long GetTickCount(void);
 
 #include "dix/dix_priv.h"
 #include "dix/input_priv.h"
+#include "os/audit.h"
 #include "os/auth.h"
 #include "os/cmdline.h"
 #include "os/ddx_priv.h"
+#include "os/log_priv.h"
 #include "os/osdep.h"
 #include "os/serverlock.h"
 
