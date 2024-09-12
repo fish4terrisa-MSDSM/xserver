@@ -905,7 +905,7 @@ FatalError(const char *f, ...)
         va_end(apple_args);
     }
 #endif
-    VErrorFSigSafe(f, args);
+    VErrorF(f, args);
     va_end(args);
     ErrorF("\n");
     if (!beenhere)
@@ -936,12 +936,6 @@ ErrorF(const char *f, ...)
     va_start(args, f);
     VErrorF(f, args);
     va_end(args);
-}
-
-void
-VErrorFSigSafe(const char *f, va_list args)
-{
-    LogVMessageVerb(X_ERROR, -1, f, args);
 }
 
 void
