@@ -852,6 +852,7 @@ Bool
 xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
 {
     static const char allow_commits[] = "_XWAYLAND_ALLOW_COMMITS";
+    static const char net_wm_opaque_region[] = "_NET_WM_OPAQUE_REGION";
     struct xwl_screen *xwl_screen;
     Pixel red_mask, blue_mask, green_mask;
     int ret, bpc, green_bpc, i;
@@ -1158,6 +1159,12 @@ xwl_screen_init(ScreenPtr pScreen, int argc, char **argv)
                                               strlen(allow_commits),
                                               TRUE);
     if (xwl_screen->allow_commits_prop == BAD_RESOURCE)
+        return FALSE;
+
+    xwl_screen->net_wm_opaque_region_prop = MakeAtom(net_wm_opaque_region,
+                                                     strlen(net_wm_opaque_region),
+                                                     TRUE);
+    if (xwl_screen->net_wm_opaque_region_prop == BAD_RESOURCE)
         return FALSE;
 
     AddCallback(&PropertyStateCallback, xwl_property_callback, pScreen);
