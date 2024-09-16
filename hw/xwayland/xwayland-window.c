@@ -181,14 +181,21 @@ xwl_window_set_allow_commits_from_property(WindowPtr window,
 }
 
 static Bool
-xwl_window_set_opaque_region(struct xwl_window *xwl_window, xRectangle *rects,
-                             int nrects)
+xwl_window_set_opaque_region(WindowPtr pWin, xRectangle *rects, int nrects)
 {
-    struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
+    struct xwl_window *xwl_window;
+    struct xwl_screen *xwl_screen;
     struct wl_region *region = NULL;
-    int scale = xwl_screen->global_surface_scale;
+    int scale;
     xRectangle *pRect;
     int n;
+
+    xwl_window = xwl_window_from_window(pWin);
+    if (!xwl_window)
+        return FALSE;
+
+    xwl_screen = xwl_window->xwl_screen;
+    scale = xwl_screen->global_surface_scale;
 
     if (rects && nrects) {
         region = wl_compositor_create_region(xwl_screen->compositor);
@@ -215,6 +222,41 @@ xwl_window_set_opaque_region(struct xwl_window *xwl_window, xRectangle *rects,
     return TRUE;
 }
 
+static Bool
+xwl_window_set_opaque_region_from_property(WindowPtr pWin, PropertyPtr prop)
+{
+    struct xwl_window *xwl_window = xwl_window_from_window(pWin);
+    struct xwl_screen *xwl_screen;
+    xRectangle *rects;
+    CARD32 *propdata;
+    int n, nrects;
+
+    if (!xwl_window)
+        return FALSE;
+
+    xwl_screen = xwl_window->xwl_screen;
+    if (prop->propertyName != xwl_screen->net_wm_opaque_region_prop)
+        return FALSE;
+
+    if (prop->type != XA_CARDINAL || prop->format != 32 || prop->size == 0)
+        return FALSE;
+
+    nrects = prop->size / 4;
+    propdata = prop->data;
+
+    rects = XNFcallocarray(nrects, sizeof(xRectangle));
+    for (n = 0; n < nrects; n++) {
+        rects[n].x = *(propdata++);
+        rects[n].y = *(propdata++);
+        rects[n].width = *(propdata++);
+        rects[n].height = *(propdata++);
+    }
+    xwl_window_set_opaque_region(pWin, rects, nrects);
+    free(rects);
+
+    return TRUE;
+}
+
 void
 xwl_window_update_property(PropertyStateRec *propstate)
 {
@@ -226,11 +268,15 @@ xwl_window_update_property(PropertyStateRec *propstate)
     case PropertyNewValue:
         if (property == xwl_screen->allow_commits_prop)
             xwl_window_set_allow_commits_from_property(pWin, propstate->prop);
+        else if (property == xwl_screen->net_wm_opaque_region_prop)
+            xwl_window_set_opaque_region_from_property(pWin, propstate->prop);
         break;
 
     case PropertyDelete:
         if (property == xwl_screen->allow_commits_prop)
             xwl_window_set_allow_commits(pWin, TRUE, "property deleted");
+        else if (property == xwl_screen->net_wm_opaque_region_prop)
+            xwl_window_set_opaque_region(pWin, NULL, 0);
         break;
 
     default:
@@ -931,7 +977,7 @@ xwl_window_maybe_resize(struct xwl_window *xwl_window, double width, double heig
     rect[0].y = 0;
     rect[0].width = width;
     rect[0].height = height;
-    xwl_window_set_opaque_region(xwl_window, rect, 1);
+    xwl_window_set_opaque_region(xwl_window->toplevel, rect, 1);
 
     if (width == xwl_screen->width && height == xwl_screen->height)
         return;
@@ -1320,6 +1366,26 @@ static const struct wp_fractional_scale_v1_listener fractional_scale_listener = 
    wp_fractional_scale_preferred_scale,
 };
 
+static void
+xwl_window_init_net_wm_opaque_region(struct xwl_window *xwl_window)
+{
+    PropertyPtr prop = NULL;
+    WindowPtr client_toplevel;
+    int ret;
+
+    client_toplevel = window_get_client_toplevel(xwl_window->toplevel);
+    if (!client_toplevel)
+        client_toplevel = xwl_window->toplevel;
+
+    ret = dixLookupProperty(&prop, client_toplevel,
+                            xwl_window->xwl_screen->net_wm_opaque_region_prop,
+                            serverClient, DixReadAccess);
+    if (ret == Success && prop)
+        xwl_window_set_opaque_region_from_property(client_toplevel, prop);
+    else
+        xwl_window_set_opaque_region(xwl_window->toplevel, NULL, 0);
+}
+
 static Bool
 xwl_create_root_surface(struct xwl_window *xwl_window)
 {
@@ -1381,7 +1447,7 @@ xwl_create_root_surface(struct xwl_window *xwl_window)
     rect[0].y = 0;
     rect[0].width = window->drawable.width;
     rect[0].height = window->drawable.height;
-    if (!xwl_window_set_opaque_region(xwl_window, rect, 1))
+    if (!xwl_window_set_opaque_region(window, rect, 1))
         goto err_surf;
 
     return TRUE;
@@ -1574,6 +1640,7 @@ ensure_surface_for_window(WindowPtr window)
     }
 
     xwl_window_set_input_region(xwl_window, wInputShape(window));
+    xwl_window_init_net_wm_opaque_region(xwl_window);
 
     return xwl_window;
 
