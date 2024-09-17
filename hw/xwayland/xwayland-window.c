@@ -213,13 +213,17 @@ void
 xwl_window_update_property(struct xwl_window *xwl_window,
                            PropertyStateRec *propstate)
 {
+    struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
+
     switch (propstate->state) {
     case PropertyNewValue:
-        xwl_window_set_allow_commits_from_property(xwl_window, propstate->prop);
+        if (propstate->prop->propertyName == xwl_screen->allow_commits_prop)
+            xwl_window_set_allow_commits_from_property(xwl_window, propstate->prop);
         break;
 
     case PropertyDelete:
-        xwl_window_set_allow_commits(xwl_window, TRUE, "property deleted");
+        if (propstate->prop->propertyName == xwl_screen->allow_commits_prop)
+            xwl_window_set_allow_commits(xwl_window, TRUE, "property deleted");
         break;
 
     default:
