@@ -174,6 +174,25 @@ xwl_window_set_allow_commits_from_property(struct xwl_window *xwl_window,
     xwl_window_set_allow_commits(xwl_window, !!propdata[0], "from property");
 }
 
+static Bool
+xwl_window_set_opaque_region(struct xwl_window *xwl_window, xRectangle *rect)
+{
+    struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
+    struct wl_region *region;
+
+    region = wl_compositor_create_region(xwl_screen->compositor);
+    if (region == NULL) {
+        ErrorF("Failed creating region\n");
+        return FALSE;
+    }
+
+    wl_region_add(region, rect->x, rect->y, rect->width, rect->height);
+    wl_surface_set_opaque_region(xwl_window->surface, region);
+    wl_region_destroy(region);
+
+    return TRUE;
+}
+
 void
 xwl_window_update_property(struct xwl_window *xwl_window,
                            PropertyStateRec *propstate)
@@ -1272,8 +1291,7 @@ xwl_create_root_surface(struct xwl_window *xwl_window)
 {
     struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
     WindowPtr window = xwl_window->toplevel;
-    struct wl_region *region;
-
+    xRectangle rect[1];
 
 #ifdef XWL_HAS_LIBDECOR
     if (xwl_screen->decorate) {
@@ -1325,16 +1343,12 @@ xwl_create_root_surface(struct xwl_window *xwl_window)
     xwl_window_rootful_set_app_id(xwl_window);
     wl_surface_commit(xwl_window->surface);
 
-    region = wl_compositor_create_region(xwl_screen->compositor);
-    if (region == NULL) {
-        ErrorF("Failed creating region\n");
+    rect[0].x = 0;
+    rect[0].y = 0;
+    rect[0].width = window->drawable.width;
+    rect[0].height = window->drawable.height;
+    if (!xwl_window_set_opaque_region(xwl_window, rect))
         goto err_surf;
-    }
-
-    wl_region_add(region, 0, 0,
-                  window->drawable.width, window->drawable.height);
-    wl_surface_set_opaque_region(xwl_window->surface, region);
-    wl_region_destroy(region);
 
     return TRUE;
 
