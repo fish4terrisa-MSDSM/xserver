@@ -887,6 +887,7 @@ xwl_window_maybe_resize(struct xwl_window *xwl_window, double width, double heig
     struct xwl_output *xwl_output;
     double scale;
     RRModePtr mode;
+    xRectangle rect[1];
 
     /* Clamp the size */
     width = min(max(width, MIN_ROOTFUL_WIDTH), MAX_ROOTFUL_WIDTH);
@@ -898,6 +899,12 @@ xwl_window_maybe_resize(struct xwl_window *xwl_window, double width, double heig
         width = round(width / scale) * scale;
         height = round(height / scale) * scale;
     }
+
+    rect[0].x = 0;
+    rect[0].y = 0;
+    rect[0].width = width;
+    rect[0].height = height;
+    xwl_window_set_opaque_region(xwl_window, rect);
 
     if (width == xwl_screen->width && height == xwl_screen->height)
         return;
