@@ -194,6 +194,10 @@ xwl_window_set_opaque_region(struct xwl_window *xwl_window, xRectangle *rect)
     wl_surface_set_opaque_region(xwl_window->surface, region);
     wl_region_destroy(region);
 
+    /* Commit now only if allowed and if the there's no pending damage */
+    if (xwl_window->allow_commits && xorg_list_is_empty(&xwl_window->link_damage))
+        wl_surface_commit(xwl_window->surface);
+
     return TRUE;
 }
 
