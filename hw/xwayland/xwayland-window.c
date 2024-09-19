@@ -179,6 +179,7 @@ xwl_window_set_opaque_region(struct xwl_window *xwl_window, xRectangle *rect)
 {
     struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
     struct wl_region *region;
+    int scale = xwl_screen->global_surface_scale;
 
     region = wl_compositor_create_region(xwl_screen->compositor);
     if (region == NULL) {
@@ -186,7 +187,10 @@ xwl_window_set_opaque_region(struct xwl_window *xwl_window, xRectangle *rect)
         return FALSE;
     }
 
-    wl_region_add(region, rect->x, rect->y, rect->width, rect->height);
+    wl_region_add(region, rect->x * scale,
+                          rect->y * scale,
+                          rect->width * scale,
+                          rect->height * scale);
     wl_surface_set_opaque_region(xwl_window->surface, region);
     wl_region_destroy(region);
 
