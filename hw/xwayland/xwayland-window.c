@@ -175,24 +175,32 @@ xwl_window_set_allow_commits_from_property(struct xwl_window *xwl_window,
 }
 
 static Bool
-xwl_window_set_opaque_region(struct xwl_window *xwl_window, xRectangle *rect)
+xwl_window_set_opaque_region(struct xwl_window *xwl_window, xRectangle *rects,
+                             int nrects)
 {
     struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
-    struct wl_region *region;
+    struct wl_region *region = NULL;
     int scale = xwl_screen->global_surface_scale;
+    xRectangle *pRect;
+    int n;
 
-    region = wl_compositor_create_region(xwl_screen->compositor);
-    if (region == NULL) {
-        ErrorF("Failed creating region\n");
-        return FALSE;
+    if (rects && nrects) {
+        region = wl_compositor_create_region(xwl_screen->compositor);
+        if (region == NULL) {
+            ErrorF("Failed creating region\n");
+            return FALSE;
+        }
+
+        for (pRect = rects, n= 0; n < nrects; pRect++, n++)
+            wl_region_add(region, pRect->x * scale,
+                                  pRect->y * scale,
+                                  pRect->width * scale,
+                                  pRect->height * scale);
     }
 
-    wl_region_add(region, rect->x * scale,
-                          rect->y * scale,
-                          rect->width * scale,
-                          rect->height * scale);
     wl_surface_set_opaque_region(xwl_window->surface, region);
-    wl_region_destroy(region);
+    if (region)
+        wl_region_destroy(region);
 
     /* Commit now only if allowed and if the there's no pending damage */
     if (xwl_window->allow_commits && xorg_list_is_empty(&xwl_window->link_damage))
@@ -912,7 +920,7 @@ xwl_window_maybe_resize(struct xwl_window *xwl_window, double width, double heig
     rect[0].y = 0;
     rect[0].width = width;
     rect[0].height = height;
-    xwl_window_set_opaque_region(xwl_window, rect);
+    xwl_window_set_opaque_region(xwl_window, rect, 1);
 
     if (width == xwl_screen->width && height == xwl_screen->height)
         return;
@@ -1362,7 +1370,7 @@ xwl_create_root_surface(struct xwl_window *xwl_window)
     rect[0].y = 0;
     rect[0].width = window->drawable.width;
     rect[0].height = window->drawable.height;
-    if (!xwl_window_set_opaque_region(xwl_window, rect))
+    if (!xwl_window_set_opaque_region(xwl_window, rect, 1))
         goto err_surf;
 
     return TRUE;
