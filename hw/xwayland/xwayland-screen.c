@@ -171,16 +171,11 @@ xwl_property_callback(CallbackListPtr *pcbl, void *closure,
 {
     ScreenPtr screen = closure;
     PropertyStateRec *rec = calldata;
-    struct xwl_window *xwl_window;
 
     if (rec->win->drawable.pScreen != screen)
         return;
 
-    xwl_window = xwl_window_get(rec->win);
-    if (!xwl_window)
-        return;
-
-    xwl_window_update_property(xwl_window, rec);
+    xwl_window_update_property(rec);
 }
 
 #define readOnlyPropertyAccessMask (DixReadAccess |\

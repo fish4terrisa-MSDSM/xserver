@@ -128,12 +128,17 @@ is_surface_from_xwl_window(struct wl_surface *surface)
 }
 
 static void
-xwl_window_set_allow_commits(struct xwl_window *xwl_window, Bool allow,
+xwl_window_set_allow_commits(WindowPtr window, Bool allow,
                              const char *debug_msg)
 {
-    struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
+    struct xwl_window *xwl_window = xwl_window_get(window);
+    struct xwl_screen *xwl_screen;
     DamagePtr damage;
 
+    if (!xwl_window)
+        return;
+
+    xwl_screen = xwl_window->xwl_screen;
     xwl_window->allow_commits = allow;
     DebugF("XWAYLAND: win %d allow_commits = %d (%s)\n",
            xwl_window->toplevel->drawable.id, allow, debug_msg);
@@ -149,18 +154,19 @@ xwl_window_set_allow_commits(struct xwl_window *xwl_window, Bool allow,
 }
 
 static void
-xwl_window_set_allow_commits_from_property(struct xwl_window *xwl_window,
+xwl_window_set_allow_commits_from_property(WindowPtr window,
                                            PropertyPtr prop)
 {
     static Bool warned = FALSE;
+    struct xwl_screen *xwl_screen = xwl_screen_get(window->drawable.pScreen);
     CARD32 *propdata;
 
-    if (prop->propertyName != xwl_window->xwl_screen->allow_commits_prop)
+    if (prop->propertyName != xwl_screen->allow_commits_prop)
         FatalError("Xwayland internal error: prop mismatch in %s.\n", __func__);
 
     if (prop->type != XA_CARDINAL || prop->format != 32 || prop->size != 1) {
         /* Not properly set, so fall back to safe and glitchy */
-        xwl_window_set_allow_commits(xwl_window, TRUE, "WM fault");
+        xwl_window_set_allow_commits(window, TRUE, "WM fault");
 
         if (!warned) {
             LogMessageVerb(X_WARNING, 0, "Window manager is misusing property %s.\n",
@@ -171,7 +177,7 @@ xwl_window_set_allow_commits_from_property(struct xwl_window *xwl_window,
     }
 
     propdata = prop->data;
-    xwl_window_set_allow_commits(xwl_window, !!propdata[0], "from property");
+    xwl_window_set_allow_commits(window, !!propdata[0], "from property");
 }
 
 static Bool
@@ -210,20 +216,21 @@ xwl_window_set_opaque_region(struct xwl_window *xwl_window, xRectangle *rects,
 }
 
 void
-xwl_window_update_property(struct xwl_window *xwl_window,
-                           PropertyStateRec *propstate)
+xwl_window_update_property(PropertyStateRec *propstate)
 {
-    struct xwl_screen *xwl_screen = xwl_window->xwl_screen;
+    WindowPtr pWin = propstate->win;
+    struct xwl_screen *xwl_screen = xwl_screen_get(pWin->drawable.pScreen);
+    Atom property = propstate->prop->propertyName;
 
     switch (propstate->state) {
     case PropertyNewValue:
-        if (propstate->prop->propertyName == xwl_screen->allow_commits_prop)
-            xwl_window_set_allow_commits_from_property(xwl_window, propstate->prop);
+        if (property == xwl_screen->allow_commits_prop)
+            xwl_window_set_allow_commits_from_property(pWin, propstate->prop);
         break;
 
     case PropertyDelete:
-        if (propstate->prop->propertyName == xwl_screen->allow_commits_prop)
-            xwl_window_set_allow_commits(xwl_window, TRUE, "property deleted");
+        if (property == xwl_screen->allow_commits_prop)
+            xwl_window_set_allow_commits(pWin, TRUE, "property deleted");
         break;
 
     default:
@@ -727,9 +734,9 @@ xwl_window_init_allow_commits(struct xwl_window *xwl_window)
                             xwl_window->xwl_screen->allow_commits_prop,
                             serverClient, DixReadAccess);
     if (ret == Success && prop)
-        xwl_window_set_allow_commits_from_property(xwl_window, prop);
+        xwl_window_set_allow_commits_from_property(xwl_window->toplevel, prop);
     else
-        xwl_window_set_allow_commits(xwl_window, TRUE, "no property");
+        xwl_window_set_allow_commits(xwl_window->toplevel, TRUE, "no property");
 }
 
 static uint32_t
