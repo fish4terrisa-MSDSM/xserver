@@ -1516,6 +1516,8 @@ ensure_surface_for_window(WindowPtr window)
     xwl_window->viewport_scale_y = 1.0;
     xwl_window->surface_scale = 1;
     xorg_list_init(&xwl_window->xwl_output_list);
+    dixSetPrivate(&window->devPrivates, &xwl_window_private_key, xwl_window);
+
     xwl_window->surface = wl_compositor_create_surface(xwl_screen->compositor);
     if (xwl_window->surface == NULL) {
         ErrorF("wl_display_create_surface failed\n");
@@ -1544,7 +1546,6 @@ ensure_surface_for_window(WindowPtr window)
 
     compRedirectWindow(serverClient, window, CompositeRedirectManual);
 
-    dixSetPrivate(&window->devPrivates, &xwl_window_private_key, xwl_window);
     xorg_list_init(&xwl_window->link_damage);
     xorg_list_add(&xwl_window->link_window, &xwl_screen->window_list);
     xorg_list_init(&xwl_window->frame_callback_list);
@@ -1577,6 +1578,7 @@ ensure_surface_for_window(WindowPtr window)
     return xwl_window;
 
 err:
+    dixSetPrivate(&window->devPrivates, &xwl_window_private_key, NULL);
     free(xwl_window);
     return NULL;
 }
