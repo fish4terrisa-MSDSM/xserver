@@ -310,7 +310,7 @@ compFreeClientWindow(WindowPtr pWin, XID id)
 
     if (pPixmap) {
         compRestoreWindow(pWin, pPixmap);
-        (*pScreen->DestroyPixmap) (pPixmap);
+        dixDestroyPixmap(pPixmap, 0);
     }
 }
 

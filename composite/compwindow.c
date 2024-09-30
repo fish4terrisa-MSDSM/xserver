@@ -182,7 +182,7 @@ compCheckRedirect(WindowPtr pWin)
 
             compSetParentPixmap(pWin);
             compRestoreWindow(pWin, pPixmap);
-            (*pScreen->DestroyPixmap) (pPixmap);
+            dixDestroyPixmap(pPixmap, 0);
         }
     }
     else if (should) {
@@ -380,13 +380,11 @@ compImplicitRedirect(WindowPtr pWin, WindowPtr pParent)
 static void
 compFreeOldPixmap(WindowPtr pWin)
 {
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
     if (pWin->redirectDraw != RedirectDrawNone) {
         CompWindowPtr cw = GetCompWindow(pWin);
 
         if (cw->pOldPixmap) {
-            (*pScreen->DestroyPixmap) (cw->pOldPixmap);
+            dixDestroyPixmap(cw->pOldPixmap, 0);
             cw->pOldPixmap = NullPixmap;
         }
     }
@@ -619,7 +617,7 @@ compDestroyWindow(WindowPtr pWin)
         PixmapPtr pPixmap = (*pScreen->GetWindowPixmap) (pWin);
 
         compSetParentPixmap(pWin);
-        (*pScreen->DestroyPixmap) (pPixmap);
+        dixDestroyPixmap(pPixmap, 0);
     }
     ret = (*pScreen->DestroyWindow) (pWin);
     cs->DestroyWindow = pScreen->DestroyWindow;
