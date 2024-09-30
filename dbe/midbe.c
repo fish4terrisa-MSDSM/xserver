@@ -164,7 +164,7 @@ miDbeAllocBackBufferName(WindowPtr pWin, XID bufId, int swapAction)
               (*pScreen->CreatePixmap) (pScreen, pDbeWindowPriv->width,
                                         pDbeWindowPriv->height,
                                         pWin->drawable.depth, 0))) {
-            (*pScreen->DestroyPixmap) (pDbeWindowPriv->pFrontBuffer);
+            dixDestroyPixmap(pDbeWindowPriv->pFrontBuffer, 0);
             return BadAlloc;
         }
 
@@ -428,14 +428,11 @@ miDbeWinPrivDelete(DbeWindowPrivPtr pDbeWindowPriv, XID bufId)
      */
 
     /* Destroy the front and back pixmaps. */
-    if (pDbeWindowPriv->pFrontBuffer) {
-        (*pDbeWindowPriv->pWindow->drawable.pScreen->
-         DestroyPixmap) (pDbeWindowPriv->pFrontBuffer);
-    }
-    if (pDbeWindowPriv->pBackBuffer) {
-        (*pDbeWindowPriv->pWindow->drawable.pScreen->
-         DestroyPixmap) (pDbeWindowPriv->pBackBuffer);
-    }
+    if (pDbeWindowPriv->pFrontBuffer)
+         dixDestroyPixmap(pDbeWindowPriv->pFrontBuffer, 0);
+
+    if (pDbeWindowPriv->pBackBuffer)
+        dixDestroyPixmap(pDbeWindowPriv->pBackBuffer, 0);
 }                               /* miDbeWinPrivDelete() */
 
 /******************************************************************************
@@ -587,13 +584,8 @@ miDbePositionWindow(WindowPtr pWin, int x, int y)
     if (!pFrontBuffer || !pBackBuffer) {
         /* We failed at creating 1 or 2 of the pixmaps. */
 
-        if (pFrontBuffer) {
-            (*pScreen->DestroyPixmap) (pFrontBuffer);
-        }
-
-        if (pBackBuffer) {
-            (*pScreen->DestroyPixmap) (pBackBuffer);
-        }
+        dixDestroyPixmap(pFrontBuffer, 0);
+        dixDestroyPixmap(pBackBuffer, 0);
 
         /* Destroy all buffers for this window. */
         while (pDbeWindowPriv) {
@@ -644,8 +636,8 @@ miDbePositionWindow(WindowPtr pWin, int x, int y)
          * pixmaps.
          */
 
-        (*pScreen->DestroyPixmap) (pDbeWindowPriv->pFrontBuffer);
-        (*pScreen->DestroyPixmap) (pDbeWindowPriv->pBackBuffer);
+        dixDestroyPixmap(pDbeWindowPriv->pFrontBuffer, 0);
+        dixDestroyPixmap(pDbeWindowPriv->pBackBuffer, 0);
 
         pDbeWindowPriv->pFrontBuffer = pFrontBuffer;
         pDbeWindowPriv->pBackBuffer = pBackBuffer;
