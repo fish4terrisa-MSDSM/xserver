@@ -98,8 +98,7 @@ ServerBitsFromGlyph(FontPtr pfont, unsigned ch, CursorMetricPtr cm,
                                                  CREATE_PIXMAP_USAGE_SCRATCH);
     pGC = GetScratchGC(1, pScreen);
     if (!ppix || !pGC) {
-        if (ppix)
-            (*pScreen->DestroyPixmap) (ppix);
+        dixDestroyPixmap(ppix, 0);
         if (pGC)
             FreeScratchGC(pGC);
         free(pbits);
@@ -129,7 +128,7 @@ ServerBitsFromGlyph(FontPtr pfont, unsigned ch, CursorMetricPtr cm,
                           XYPixmap, 1, pbits);
     *ppbits = (unsigned char *) pbits;
     FreeScratchGC(pGC);
-    (*pScreen->DestroyPixmap) (ppix);
+    dixDestroyPixmap(ppix, 0);
     return Success;
 }
 
