@@ -1504,7 +1504,8 @@ damageDestroyPixmap(PixmapPtr pPixmap)
         }
     }
     unwrap(pScrPriv, pScreen, DestroyPixmap);
-    (*pScreen->DestroyPixmap) (pPixmap);
+    if (pScreen->DestroyPixmap)
+        pScreen->DestroyPixmap(pPixmap);
     wrap(pScrPriv, pScreen, DestroyPixmap, damageDestroyPixmap);
     return TRUE;
 }
