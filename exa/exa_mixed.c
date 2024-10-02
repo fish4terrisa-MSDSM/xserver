@@ -251,6 +251,8 @@ exaDestroyPixmap_mixed(PixmapPtr pPixmap)
 
     if (pPixmap->refcnt == 1) {
         ExaPixmapPriv(pPixmap);
+        if (!pExaPixmap)
+            goto out; // we're called on an error path
 
         exaDestroyPixmap(pPixmap);
 
@@ -268,6 +270,7 @@ exaDestroyPixmap_mixed(PixmapPtr pPixmap)
         }
     }
 
+out:
     swap(pExaScr, pScreen, DestroyPixmap);
     if (pScreen->DestroyPixmap)
         ret = pScreen->DestroyPixmap(pPixmap);
