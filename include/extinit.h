@@ -53,70 +53,19 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include "extnsionst.h"
 
+/* required by: libglx */
 #ifdef COMPOSITE
 extern _X_EXPORT Bool noCompositeExtension;
 #endif
 
-#ifdef DAMAGE
-extern _X_EXPORT Bool noDamageExtension;
-#endif
-
-#if defined(DBE)
-extern _X_EXPORT Bool noDbeExtension;
-#endif
-
-#if defined(DPMSExtension)
-extern _X_EXPORT Bool noDPMSExtension;
-#endif
-
-#ifdef GLXEXT
-extern _X_EXPORT Bool noGlxExtension;
-#endif
-
+/* required by: several video drivers (eg. vmware and sis) */
 #ifdef PANORAMIX
 extern _X_EXPORT Bool noPanoramiXExtension;
 #endif
 
-#ifdef RANDR
-extern _X_EXPORT Bool noRRExtension;
-#endif
-
-extern _X_EXPORT Bool noRenderExtension;
-
-#if defined(RES)
-extern _X_EXPORT Bool noResExtension;
-#endif
-
-#if defined(SCREENSAVER)
-extern _X_EXPORT Bool noScreenSaverExtension;
-#endif
-
-extern _X_EXPORT Bool noShapeExtension;
-
-#ifdef MITSHM
-extern _X_EXPORT Bool noMITShmExtension;
-#endif
-
-#ifdef XCSECURITY
-extern _X_EXPORT Bool noSecurityExtension;
-#endif
-
-#ifdef XF86BIGFONT
-extern _X_EXPORT Bool noXFree86BigfontExtension;
-#endif
-
-extern _X_EXPORT Bool noXFixesExtension;
-
-#if defined(XSELINUX)
-extern _X_EXPORT Bool noSELinuxExtension;
-#endif
-
+/* required by: intel_drv */
 #if defined(XV)
 extern _X_EXPORT Bool noXvExtension;
-#endif
-
-#if defined(PRESENT)
-#include "presentext.h"
 #endif
 
 #endif

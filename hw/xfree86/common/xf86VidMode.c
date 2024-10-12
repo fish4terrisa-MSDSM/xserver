@@ -42,13 +42,14 @@
 #include "os.h"
 #include "xf86.h"
 #include "xf86Priv.h"
-#include "extinit.h"
 
 #ifdef XF86VIDMODE
 #include "vidmodestr.h"
 #include "xf86Privstr.h"
 #include "xf86Extensions.h"
 #include "xf86cmap.h"
+
+Bool noXFree86VidModeExtension = FALSE;
 
 static vidMonitorValue
 xf86VidModeGetMonitorValue(ScreenPtr pScreen, int valtyp, int indx)

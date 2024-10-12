@@ -40,10 +40,10 @@
 #include <X11/Xproto.h>
 
 #include "dix/dix_priv.h"
+#include "miext/extinit_priv.h"
 
 #include "scrnintstr.h"
 #include "extnsionst.h"
-#include "extinit_priv.h"
 #include "gcstruct.h"
 #include "dixstruct.h"
 #include "dbestruct.h"
@@ -51,6 +51,7 @@
 #include "xace.h"
 
 /* GLOBALS */
+Bool noDbeExtension = FALSE;
 
 /* These are globals for use by DDX */
 DevPrivateKeyRec dbeScreenPrivKeyRec;

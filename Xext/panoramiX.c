@@ -32,6 +32,7 @@ Equipment Corporation.
 #include <X11/extensions/panoramiXproto.h>
 
 #include "dix/dix_priv.h"
+#include "miext/extinit_priv.h"
 
 #include "misc.h"
 #include "cursor.h"
@@ -55,13 +56,15 @@ Equipment Corporation.
 #ifdef COMPOSITE
 #include "compint.h"
 #endif
-#include "extinit_priv.h"
 #include "protocol-versions.h"
 
 #ifdef GLXPROXY
 extern VisualPtr glxMatchVisual(ScreenPtr pScreen,
                                 VisualPtr pVisual, ScreenPtr pMatchScreen);
 #endif
+
+/* Xinerama is disabled by default unless enabled via +xinerama */
+Bool noPanoramiXExtension = TRUE;
 
 /*
  *	PanoramiX data declarations

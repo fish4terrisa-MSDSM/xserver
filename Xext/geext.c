@@ -24,13 +24,18 @@
  */
 
 #include <dix-config.h>
-#include "windowstr.h"
+
 #include <X11/extensions/ge.h>
+
+#include "windowstr.h"
+
+#include "miext/extinit_priv.h"
 
 #include "geint.h"
 #include "geext.h"
 #include "protocol-versions.h"
-#include "extinit_priv.h"
+
+Bool noGEExtension = FALSE;
 
 DevPrivateKeyRec GEClientPrivateKeyRec;
 
