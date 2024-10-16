@@ -63,6 +63,7 @@ RRPointerToNearestCrtc(DeviceIntPtr pDev, ScreenPtr pScreen, int x, int y,
     RRCrtcPtr nearest = NULL;
     int best = 0;
     int best_dx = 0, best_dy = 0;
+    int best_crtc_width = 0, best_crtc_height = 0;
 
     for (c = 0; c < pScrPriv->numCrtcs; c++) {
         RRCrtcPtr crtc = pScrPriv->crtcs[c];
@@ -96,10 +97,12 @@ RRPointerToNearestCrtc(DeviceIntPtr pDev, ScreenPtr pScreen, int x, int y,
             best_dx = dx;
             best_dy = dy;
             best = dist;
+            best_crtc_width = scan_width;
+            best_crtc_height = scan_height;
         }
     }
     if (best_dx || best_dy)
-        (*pScreen->SetCursorPosition) (pDev, pScreen, x + best_dx, y + best_dy,
+        (*pScreen->SetCursorPosition) (pDev, pScreen, best_crtc_width / 2, best_crtc_height / 2,
                                        TRUE);
     pScrPriv->pointerCrtc = nearest;
 }
