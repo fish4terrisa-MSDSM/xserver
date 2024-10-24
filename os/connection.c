@@ -217,12 +217,8 @@ NotifyParentProcess(void)
 }
 
 static Bool
-TryCreateSocket(int num, int *partial)
+TryCreateSocket(const char *port, int *partial)
 {
-    char port[20];
-
-    snprintf(port, sizeof(port), "%d", num);
-
     return (_XSERVTransMakeAllCOTSServerListeners(port, partial,
                                                   &ListenTransCount,
                                                   &ListenTransConns) >= 0);
@@ -246,7 +242,7 @@ CreateWellKnownSockets(void)
         ListenTransCount = 0;
     }
     else if ((displayfd < 0) || explicit_display) {
-        if (TryCreateSocket(atoi(display), &partial) &&
+        if (TryCreateSocket(display, &partial) &&
             ListenTransCount >= 1)
             if (!PartialNetwork && partial)
                 FatalError ("Failed to establish all listening sockets");
@@ -254,7 +250,10 @@ CreateWellKnownSockets(void)
     else { /* -displayfd and no explicit display number */
         Bool found = 0;
         for (i = 0; i < 65536 - X_TCP_PORT; i++) {
-            if (TryCreateSocket(i, &partial) && !partial) {
+            char port[20];
+
+            snprintf(port, sizeof(port), "%d", i);
+            if (TryCreateSocket(port, &partial) && !partial) {
                 found = 1;
                 break;
             }
