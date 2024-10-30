@@ -123,7 +123,7 @@ validGlxFBConfigForWindow(ClientPtr client, __GLXconfig * config,
     }
 
     /* FIXME: What exactly should we check here... */
-    if (pVisual->class != glxConvertToXVisualType(config->visualType) ||
+    if (!pVisual || pVisual->class != glxConvertToXVisualType(config->visualType) ||
         !(config->drawableType & GLX_WINDOW_BIT)) {
         client->errorValue = pDraw->id;
         *err = BadMatch;
@@ -1116,7 +1116,7 @@ DoGetFBConfigs(__GLXclientState * cl, unsigned screen)
             WRITE_PAIR(GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, modes->sRGBCapable);
         }
         /* Pad the remaining place with zeroes, so that attributes count is constant. */
-        while (p < __GLX_FBCONFIG_ATTRIBS_LENGTH) {
+        while (p < __GLX_FBCONFIG_ATTRIBS_LENGTH - 1) {
             WRITE_PAIR(0, 0);
         }
         assert(p == __GLX_FBCONFIG_ATTRIBS_LENGTH);
