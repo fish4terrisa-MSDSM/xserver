@@ -254,10 +254,10 @@ miScreenInit(ScreenPtr pScreen, void *pbits,  /* pointer to screen bits */
     pScreen->numVisuals = numVisuals;
     pScreen->visuals = visuals;
     if (width) {
+        pScreen->CloseScreen = miCloseScreen;
 #ifdef MITSHM
         ShmRegisterFbFuncs(pScreen);
 #endif
-        pScreen->CloseScreen = miCloseScreen;
     }
     /* else CloseScreen */
     /* QueryBestSize */
