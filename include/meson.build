@@ -493,7 +493,6 @@ if build_xorg
             'displaymode.h',
             'window.h',
             'windowstr.h',
-            'xkbfile.h',
             'xkbsrv.h',
             'xkbstr.h',
             'xkbrules.h',
