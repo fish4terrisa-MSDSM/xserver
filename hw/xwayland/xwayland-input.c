@@ -574,12 +574,7 @@ pointer_handle_enter(void *data, struct wl_pointer *pointer,
         if (BitIsOn(dev->button->down, i))
             QueuePointerEvents(dev, ButtonRelease, i, 0, &mask);
 
-    /* The last cursor frame we committed before the pointer left one
-     * of our surfaces might not have been shown. In that case we'll
-     * have a cursor surface frame callback pending which we need to
-     * clear so that we can continue submitting new cursor frames. */
-    if (xwl_cursor_clear_frame_cb(&xwl_seat->cursor))
-        xwl_seat_set_cursor(xwl_seat);
+    xwl_seat_set_cursor(xwl_seat);
 
     if (xwl_seat->pointer_warp_emulator) {
         xwl_pointer_warp_emulator_maybe_lock(xwl_seat->pointer_warp_emulator,
@@ -1920,20 +1915,9 @@ static const struct wl_seat_listener seat_listener = {
 };
 
 static void
-xwl_cursor_init(struct xwl_cursor *xwl_cursor, struct xwl_screen *xwl_screen,
-                void (* update_proc)(struct xwl_cursor *))
+xwl_cursor_init(struct xwl_cursor *xwl_cursor, struct xwl_screen *xwl_screen)
 {
     xwl_cursor->surface = wl_compositor_create_surface(xwl_screen->compositor);
-    xwl_cursor->update_proc = update_proc;
-    xwl_cursor->frame_cb = NULL;
-    xwl_cursor->needs_update = FALSE;
-}
-
-static void
-xwl_seat_update_cursor(struct xwl_cursor *xwl_cursor)
-{
-    struct xwl_seat *xwl_seat = wl_container_of(xwl_cursor, xwl_seat, cursor);
-    xwl_seat_set_cursor(xwl_seat);
 }
 
 static void
@@ -1956,8 +1940,7 @@ create_input_device(struct xwl_screen *xwl_screen, uint32_t id, uint32_t version
                          &wl_seat_interface, min(version, seat_version));
     xwl_seat->id = id;
 
-    xwl_cursor_init(&xwl_seat->cursor, xwl_seat->xwl_screen,
-                    xwl_seat_update_cursor);
+    xwl_cursor_init(&xwl_seat->cursor, xwl_seat->xwl_screen);
     wl_seat_add_listener(xwl_seat->seat, &seat_listener, xwl_seat);
 
     init_tablet_manager_seat(xwl_screen, xwl_seat);
@@ -2147,10 +2130,6 @@ tablet_tool_proximity_in(void *data, struct zwp_tablet_tool_v2 *tool,
     xwl_tablet_tool->proximity_in_serial = serial;
     xwl_seat->tablet_focus_window = wl_surface_get_user_data(wl_surface);
 
-    /* If there is a cursor surface frame callback pending, we need to clear it
-     * so that we can continue submitting new cursor frames.
-     */
-    xwl_cursor_clear_frame_cb(&xwl_tablet_tool->cursor);
     xwl_tablet_tool_set_cursor(xwl_tablet_tool);
 }
 
@@ -2893,15 +2872,6 @@ tablet_seat_handle_add_tablet(void *data, struct zwp_tablet_seat_v2 *tablet_seat
 }
 
 static void
-xwl_tablet_tool_update_cursor(struct xwl_cursor *xwl_cursor)
-{
-    struct xwl_tablet_tool *xwl_tablet_tool = wl_container_of(xwl_cursor,
-                                                              xwl_tablet_tool,
-                                                              cursor);
-    xwl_tablet_tool_set_cursor(xwl_tablet_tool);
-}
-
-static void
 tablet_seat_handle_add_tool(void *data, struct zwp_tablet_seat_v2 *tablet_seat,
                             struct zwp_tablet_tool_v2 *tool)
 {
@@ -2917,8 +2887,7 @@ tablet_seat_handle_add_tool(void *data, struct zwp_tablet_seat_v2 *tablet_seat,
 
     xwl_tablet_tool->tool = tool;
     xwl_tablet_tool->seat = xwl_seat;
-    xwl_cursor_init(&xwl_tablet_tool->cursor, xwl_screen,
-                    xwl_tablet_tool_update_cursor);
+    xwl_cursor_init(&xwl_tablet_tool->cursor, xwl_screen);
 
     xorg_list_add(&xwl_tablet_tool->link, &xwl_seat->tablet_tools);
 

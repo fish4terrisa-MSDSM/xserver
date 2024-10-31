@@ -114,24 +114,6 @@ xwl_unrealize_cursor(DeviceIntPtr device, ScreenPtr screen, CursorPtr cursor)
 }
 
 static void
-frame_callback(void *data,
-               struct wl_callback *callback,
-               uint32_t time)
-{
-    struct xwl_cursor *xwl_cursor = data;
-
-    xwl_cursor_clear_frame_cb(xwl_cursor);
-    if (xwl_cursor->needs_update) {
-        xwl_cursor->needs_update = FALSE;
-        xwl_cursor->update_proc(xwl_cursor);
-    }
-}
-
-static const struct wl_callback_listener frame_listener = {
-    frame_callback
-};
-
-static void
 xwl_cursor_buffer_release_callback(void *data)
 {
     /* drop the reference we took in set_cursor */
@@ -170,9 +152,6 @@ xwl_cursor_attach_pixmap(struct xwl_seat *xwl_seat,
                        xwl_seat->x_cursor->bits->width,
                        xwl_seat->x_cursor->bits->height);
 
-    xwl_cursor->frame_cb = wl_surface_frame(xwl_cursor->surface);
-    wl_callback_add_listener(xwl_cursor->frame_cb, &frame_listener, xwl_cursor);
-
     /* Hold a reference on the pixmap until it's released by the compositor */
     pixmap->refcnt++;
     xwl_pixmap_set_buffer_release_cb(pixmap,
@@ -180,18 +159,6 @@ xwl_cursor_attach_pixmap(struct xwl_seat *xwl_seat,
                                      pixmap);
 
     wl_surface_commit(xwl_cursor->surface);
-}
-
-Bool
-xwl_cursor_clear_frame_cb(struct xwl_cursor *xwl_cursor)
-{
-    if (xwl_cursor->frame_cb) {
-        wl_callback_destroy(xwl_cursor->frame_cb);
-        xwl_cursor->frame_cb = NULL;
-        return TRUE;
-    }
-
-    return FALSE;
 }
 
 void
@@ -209,13 +176,6 @@ xwl_seat_set_cursor(struct xwl_seat *xwl_seat)
     if (!xwl_seat->x_cursor) {
         wl_pointer_set_cursor(xwl_seat->wl_pointer,
                               xwl_seat->pointer_enter_serial, NULL, 0, 0);
-        xwl_cursor_clear_frame_cb(xwl_cursor);
-        xwl_cursor->needs_update = FALSE;
-        return;
-    }
-
-    if (xwl_cursor->frame_cb) {
-        xwl_cursor->needs_update = TRUE;
         return;
     }
 
@@ -252,13 +212,6 @@ xwl_tablet_tool_set_cursor(struct xwl_tablet_tool *xwl_tablet_tool)
         zwp_tablet_tool_v2_set_cursor(xwl_tablet_tool->tool,
                                       xwl_tablet_tool->proximity_in_serial,
                                       NULL, 0, 0);
-        xwl_cursor_clear_frame_cb(xwl_cursor);
-        xwl_cursor->needs_update = FALSE;
-        return;
-    }
-
-    if (xwl_cursor->frame_cb) {
-        xwl_cursor->needs_update = TRUE;
         return;
     }
 
@@ -285,7 +238,6 @@ void
 xwl_cursor_release(struct xwl_cursor *xwl_cursor)
 {
     wl_surface_destroy(xwl_cursor->surface);
-    xwl_cursor_clear_frame_cb(xwl_cursor);
 }
 
 static void
