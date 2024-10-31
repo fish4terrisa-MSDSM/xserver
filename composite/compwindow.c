@@ -104,19 +104,13 @@ typedef struct _compPixmapVisit {
 static Bool
 compRepaintBorder(ClientPtr pClient, void *closure)
 {
-    WindowPtr pWindow;
-    int rc =
-        dixLookupWindow(&pWindow, (XID) (intptr_t) closure, pClient,
-                        DixWriteAccess);
+    WindowPtr pWindow = closure;
+    RegionRec exposed;
 
-    if (rc == Success) {
-        RegionRec exposed;
-
-        RegionNull(&exposed);
-        RegionSubtract(&exposed, &pWindow->borderClip, &pWindow->winSize);
-        pWindow->drawable.pScreen->PaintWindow(pWindow, &exposed, PW_BORDER);
-        RegionUninit(&exposed);
-    }
+    RegionNull(&exposed);
+    RegionSubtract(&exposed, &pWindow->borderClip, &pWindow->winSize);
+    pWindow->drawable.pScreen->PaintWindow(pWindow, &exposed, PW_BORDER);
+    RegionUninit(&exposed);
     return TRUE;
 }
 
@@ -137,8 +131,7 @@ compSetPixmapVisitWindow(WindowPtr pWindow, void *data)
     SetWinSize(pWindow);
     SetBorderSize(pWindow);
     if (pVisit->bw)
-        QueueWorkProc(compRepaintBorder, serverClient,
-                      (void *) (intptr_t) pWindow->drawable.id);
+        QueueWorkProc(compRepaintBorder, serverClient, pWindow);
     return WT_WALKCHILDREN;
 }
 
