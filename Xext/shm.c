@@ -250,13 +250,14 @@ ShmDestroyPixmap(PixmapPtr pPixmap)
     ScreenPtr pScreen = pPixmap->drawable.pScreen;
     ShmScrPrivateRec *screen_priv = ShmGetScreenPriv(pScreen);
     void *shmdesc = NULL;
-    Bool ret;
+    Bool ret = TRUE;
 
     if (pPixmap->refcnt == 1)
         shmdesc = dixLookupPrivate(&pPixmap->devPrivates, shmPixmapPrivateKey);
 
     pScreen->DestroyPixmap = screen_priv->destroyPixmap;
-    ret = (*pScreen->DestroyPixmap) (pPixmap);
+    if (pScreen->DestroyPixmap)
+        ret = pScreen->DestroyPixmap(pPixmap);
     screen_priv->destroyPixmap = pScreen->DestroyPixmap;
     pScreen->DestroyPixmap = ShmDestroyPixmap;
 
@@ -508,7 +509,7 @@ doShmPutImage(DrawablePtr dst, GCPtr pGC,
         else
             (void) (*pGC->ops->CopyArea) (&pPixmap->drawable, dst, pGC, 0, 0,
                                           sw, sh, dx, dy);
-        (*pPixmap->drawable.pScreen->DestroyPixmap) (pPixmap);
+        dixDestroyPixmap(pPixmap, 0);
     }
 }
 
@@ -998,7 +999,7 @@ ProcPanoramiXShmCreatePixmap(ClientPtr client)
             result = XaceHookResourceAccess(client, stuff->pid,
                               X11_RESTYPE_PIXMAP, pMap, X11_RESTYPE_NONE, NULL, DixCreateAccess);
             if (result != Success) {
-                pDraw->pScreen->DestroyPixmap(pMap);
+                dixDestroyPixmap(pMap, 0);
                 break;
             }
             dixSetPrivate(&pMap->devPrivates, shmPixmapPrivateKey, shmdesc);
@@ -1042,7 +1043,7 @@ fbShmCreatePixmap(ScreenPtr pScreen,
                                          BitsPerPixel(depth),
                                          PixmapBytePad(width, depth),
                                          (void *) addr)) {
-        (*pScreen->DestroyPixmap) (pPixmap);
+        dixDestroyPixmap(pPixmap, 0);
         return NullPixmap;
     }
     return pPixmap;
@@ -1113,7 +1114,7 @@ ProcShmCreatePixmap(ClientPtr client)
         rc = XaceHookResourceAccess(client, stuff->pid, X11_RESTYPE_PIXMAP,
                       pMap, X11_RESTYPE_NONE, NULL, DixCreateAccess);
         if (rc != Success) {
-            pDraw->pScreen->DestroyPixmap(pMap);
+            dixDestroyPixmap(pMap, 0);
             return rc;
         }
         dixSetPrivate(&pMap->devPrivates, shmPixmapPrivateKey, shmdesc);

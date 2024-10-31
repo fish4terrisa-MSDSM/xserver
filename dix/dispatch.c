@@ -1462,8 +1462,9 @@ int
 dixDestroyPixmap(void *value, XID pid)
 {
     PixmapPtr pPixmap = (PixmapPtr) value;
-
-    return (*pPixmap->drawable.pScreen->DestroyPixmap) (pPixmap);
+    if (pPixmap && pPixmap->drawable.pScreen && pPixmap->drawable.pScreen->DestroyPixmap)
+        return pPixmap->drawable.pScreen->DestroyPixmap(pPixmap);
+    return TRUE;
 }
 
 int
@@ -1523,7 +1524,7 @@ ProcCreatePixmap(ClientPtr client)
         rc = XaceHookResourceAccess(client, stuff->pid, X11_RESTYPE_PIXMAP,
                       pMap, X11_RESTYPE_NONE, NULL, DixCreateAccess);
         if (rc != Success) {
-            (*pDraw->pScreen->DestroyPixmap) (pMap);
+            dixDestroyPixmap(pMap, 0);
             return rc;
         }
         if (AddResource(stuff->pid, X11_RESTYPE_PIXMAP, (void *) pMap))
