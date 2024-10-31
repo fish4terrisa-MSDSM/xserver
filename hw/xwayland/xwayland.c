@@ -477,3 +477,19 @@ InitOutput(ScreenInfo * screen_info, int argc, char **argv)
         listen_on_fds();
     }
 }
+
+int
+main(int argc, char *argv[], char *envp[])
+{
+#ifdef XTEST
+    /* Most features from the XTEST extension cannot work on Wayland,
+     * disable the XTEST extension so apps aren't tempted to use it.
+     *
+     * Using the standard command line option "+extension XTEST"
+     * can re-enable it at runtime, if really needed.
+     */
+    noTestExtensions = TRUE;
+#endif
+
+    return dix_main(argc, argv, envp);
+}
