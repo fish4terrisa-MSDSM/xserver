@@ -19,10 +19,10 @@ is" without express or implied warranty.
 #include <X11/Xproto.h>
 
 #include "mi/mi_priv.h"
+#include "mi/mipointer_priv.h"
 
 #include "scrnintstr.h"
 #include "dix.h"
-#include "mi.h"
 #include "micmap.h"
 #include "colormapst.h"
 #include "resource.h"

@@ -38,6 +38,8 @@
 #include "dix/input_priv.h"
 #include "dix/dix_priv.h"
 #include "dix/exevents_priv.h"
+#include "mi/mi_priv.h"
+#include "mi/mipointer_priv.h"
 #include "os/osdep.h"
 
 #include "misc.h"
@@ -49,7 +51,6 @@
 #include "scrnintstr.h"
 #include "dixevents.h"
 #include "sleepuntil.h"
-#include "mi.h"
 #include "xkbsrv.h"
 #include "xkbstr.h"
 #include "exglobals.h"
