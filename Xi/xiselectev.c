@@ -343,8 +343,6 @@ ProcXIGetSelectedEvents(ClientPtr client)
 {
     int rc, i;
     WindowPtr win;
-    char *buffer = NULL;
-    xXIGetSelectedEventsReply reply;
     OtherInputMasks *masks;
     InputClientsPtr others = NULL;
     xXIEventMask *evmask = NULL;
@@ -358,12 +356,10 @@ ProcXIGetSelectedEvents(ClientPtr client)
     if (rc != Success)
         return rc;
 
-    reply = (xXIGetSelectedEventsReply) {
+    xXIGetSelectedEventsReply rep = {
         .repType = X_Reply,
         .RepType = X_XIGetSelectedEvents,
         .sequenceNumber = client->sequence,
-        .length = 0,
-        .num_masks = 0
     };
 
     masks = wOtherInputMasks(win);
@@ -377,14 +373,12 @@ ProcXIGetSelectedEvents(ClientPtr client)
     }
 
     if (!others) {
-        WriteReplyToClient(client, sizeof(xXIGetSelectedEventsReply), &reply);
+        WriteReplyToClient(client, sizeof(xXIGetSelectedEventsReply), &rep);
         return Success;
     }
 
-    buffer =
-        calloc(MAXDEVICES, sizeof(xXIEventMask) + pad_to_int32(XI2MASKSIZE));
-    if (!buffer)
-        return BadAlloc;
+    char buffer[MAXDEVICES * (sizeof(xXIEventMask) + pad_to_int32(XI2MASKSIZE))];
+    memset(buffer, 0, sizeof(buffer));
 
     evmask = (xXIEventMask *) buffer;
     for (i = 0; i < MAXDEVICES; i++) {
@@ -403,8 +397,8 @@ ProcXIGetSelectedEvents(ClientPtr client)
 
                 evmask->deviceid = i;
                 evmask->mask_len = mask_len;
-                reply.num_masks++;
-                reply.length += sizeof(xXIEventMask) / 4 + evmask->mask_len;
+                rep.num_masks++;
+                rep.length += sizeof(xXIEventMask) / 4 + evmask->mask_len;
 
                 if (client->swapped) {
                     swaps(&evmask->deviceid);
@@ -420,13 +414,12 @@ ProcXIGetSelectedEvents(ClientPtr client)
     }
 
     /* save the value before SRepXIGetSelectedEvents swaps it */
-    length = reply.length;
-    WriteReplyToClient(client, sizeof(xXIGetSelectedEventsReply), &reply);
+    length = rep.length;
+    WriteReplyToClient(client, sizeof(xXIGetSelectedEventsReply), &rep);
 
-    if (reply.num_masks)
+    if (rep.num_masks)
         WriteToClient(client, length * 4, buffer);
 
-    free(buffer);
     return Success;
 }
 

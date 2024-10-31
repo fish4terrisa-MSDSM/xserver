@@ -276,7 +276,6 @@ int
 ProcXGetFeedbackControl(ClientPtr client)
 {
     int rc, total_length = 0;
-    char *buf, *savbuf;
     DeviceIntPtr dev;
     KbdFeedbackPtr k;
     PtrFeedbackPtr p;
@@ -284,7 +283,6 @@ ProcXGetFeedbackControl(ClientPtr client)
     StringFeedbackPtr s;
     BellFeedbackPtr b;
     LedFeedbackPtr l;
-    xGetFeedbackControlReply rep;
 
     REQUEST(xGetFeedbackControlReq);
     REQUEST_SIZE_MATCH(xGetFeedbackControlReq);
@@ -293,12 +291,10 @@ ProcXGetFeedbackControl(ClientPtr client)
     if (rc != Success)
         return rc;
 
-    rep = (xGetFeedbackControlReply) {
+    xGetFeedbackControlReply rep = {
         .repType = X_Reply,
         .RepType = X_GetFeedbackControl,
         .sequenceNumber = client->sequence,
-        .length = 0,
-        .num_feedbacks = 0
     };
 
     for (k = dev->kbdfeed; k; k = k->next) {
@@ -330,10 +326,9 @@ ProcXGetFeedbackControl(ClientPtr client)
     if (total_length == 0)
         return BadMatch;
 
-    buf = (char *) malloc(total_length);
-    if (!buf)
-        return BadAlloc;
-    savbuf = buf;
+    char savbuf[total_length];
+    memset(savbuf, 0, sizeof(savbuf));
+    char *buf = savbuf;
 
     for (k = dev->kbdfeed; k; k = k->next)
         CopySwapKbdFeedback(client, k, &buf);
@@ -351,6 +346,5 @@ ProcXGetFeedbackControl(ClientPtr client)
     rep.length = bytes_to_int32(total_length);
     WriteReplyToClient(client, sizeof(xGetFeedbackControlReply), &rep);
     WriteToClient(client, total_length, savbuf);
-    free(savbuf);
     return Success;
 }
