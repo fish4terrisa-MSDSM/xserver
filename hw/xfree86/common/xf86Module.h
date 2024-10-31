@@ -147,19 +147,13 @@ typedef struct {
 #define GET_MODULE_MINOR_VERSION(vers)	(((vers) >> 16) & 0xFF)
 #define GET_MODULE_PATCHLEVEL(vers)	((vers) & 0xFFFF)
 
-#define INITARGS void
-
 /* Prototypes for Loader functions that are exported to modules */
 extern _X_EXPORT void *LoadSubModule(void *, const char *, const char **,
                                        const char **, void *,
                                        const XF86ModReqInfo *, int *, int *);
-extern _X_EXPORT void UnloadSubModule(void *);
-extern _X_EXPORT void UnloadModule(void *);
 extern _X_EXPORT void *LoaderSymbol(const char *);
 extern _X_EXPORT void *LoaderSymbolFromModule(void *, const char *);
 extern _X_EXPORT void LoaderErrorMsg(const char *, const char *, int, int);
-extern _X_EXPORT Bool LoaderShouldIgnoreABI(void);
-extern _X_EXPORT int LoaderGetABIVersion(const char *abiclass);
 
 typedef void *(*ModuleSetupProc) (void *, void *, int *, int *);
 typedef void (*ModuleTearDownProc) (void *);
