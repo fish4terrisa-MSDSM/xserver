@@ -612,8 +612,6 @@ static int _X_COLD
 SProcSecurityQueryVersion(ClientPtr client)
 {
     REQUEST(xSecurityQueryVersionReq);
-
-    swaps(&stuff->length);
     REQUEST_SIZE_MATCH(xSecurityQueryVersionReq);
     swaps(&stuff->majorVersion);
     swaps(&stuff->minorVersion);
@@ -627,8 +625,6 @@ SProcSecurityGenerateAuthorization(ClientPtr client)
     CARD32 *values;
     unsigned long nvalues;
     int values_offset;
-
-    swaps(&stuff->length);
     REQUEST_AT_LEAST_SIZE(xSecurityGenerateAuthorizationReq);
     swaps(&stuff->nbytesAuthProto);
     swaps(&stuff->nbytesAuthData);
@@ -636,10 +632,10 @@ SProcSecurityGenerateAuthorization(ClientPtr client)
     values_offset = bytes_to_int32(stuff->nbytesAuthProto) +
         bytes_to_int32(stuff->nbytesAuthData);
     if (values_offset >
-        stuff->length - bytes_to_int32(sz_xSecurityGenerateAuthorizationReq))
+        client->req_len - bytes_to_int32(sz_xSecurityGenerateAuthorizationReq))
         return BadLength;
     values = (CARD32 *) (&stuff[1]) + values_offset;
-    nvalues = (((CARD32 *) stuff) + stuff->length) - values;
+    nvalues = (((CARD32 *) stuff) + client->req_len) - values;
     SwapLongs(values, nvalues);
     return ProcSecurityGenerateAuthorization(client);
 }                               /* SProcSecurityGenerateAuthorization */
@@ -648,8 +644,6 @@ static int _X_COLD
 SProcSecurityRevokeAuthorization(ClientPtr client)
 {
     REQUEST(xSecurityRevokeAuthorizationReq);
-
-    swaps(&stuff->length);
     REQUEST_SIZE_MATCH(xSecurityRevokeAuthorizationReq);
     swapl(&stuff->authId);
     return ProcSecurityRevokeAuthorization(client);
