@@ -77,7 +77,7 @@ __stdcall unsigned long GetTickCount(void);
 #define TRANS_REOPEN
 #include <X11/Xtrans/Xtrans.h>
 
-#include "os/audit.h"
+#include <libgen.h>
 
 #include "input.h"
 #include "dixfont.h"
@@ -105,9 +105,11 @@ __stdcall unsigned long GetTickCount(void);
 
 #include "dix/dix_priv.h"
 #include "dix/input_priv.h"
+#include "os/audit.h"
 #include "os/auth.h"
 #include "os/cmdline.h"
 #include "os/ddx_priv.h"
+#include "os/log_priv.h"
 #include "os/osdep.h"
 #include "os/serverlock.h"
 
@@ -496,6 +498,12 @@ ProcessCommandLine(int argc, char *argv[])
     }
     SeatId = getenv("XDG_SEAT");
 
+#ifdef CONFIG_SYSLOG
+    xorgSyslogIdent = getenv("SYSLOG_IDENT");
+    if (!xorgSyslogIdent)
+        xorgSyslogIdent = strdup(basename(argv[0]));
+#endif
+
     for (i = 1; i < argc; i++) {
         /* call ddx first, so it can peek/override if it wants */
         if ((skip = ddxProcessArgument(argc, argv, i))) {
@@ -865,6 +873,9 @@ ProcessCommandLine(int argc, char *argv[])
             else
                 UseMsg();
         }
+#ifdef CONFIG_SYSLOG
+        else if (ProcessCmdLineMultiInt(argc, argv, &i, "-syslogverbose", &xorgSyslogVerbosity));
+#endif
         else {
             ErrorF("Unrecognized option: %s\n", argv[i]);
             UseMsg();

@@ -54,6 +54,7 @@
 #include "dix/screenint_priv.h"
 #include "os/cmdline.h"
 #include "os/ddx_priv.h"
+#include "os/log_priv.h"
 #include "os/osdep.h"
 
 #include "servermd.h"
@@ -868,14 +869,14 @@ void
 xf86SetVerbosity(int verb)
 {
     xf86Verbose = verb;
-    LogSetParameter(XLOG_VERBOSITY, verb);
+    xorgLogVerbosity = verb;
 }
 
 void
 xf86SetLogVerbosity(int verb)
 {
     xf86LogVerbose = verb;
-    LogSetParameter(XLOG_FILE_VERBOSITY, verb);
+    xorgLogFileVerbosity = verb;
 }
 
 static void

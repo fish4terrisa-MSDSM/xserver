@@ -39,6 +39,7 @@
 #include "dix/screenint_priv.h"
 #include "os/cmdline.h"
 #include "os/ddx_priv.h"
+#include "os/log_priv.h"
 #include "os/osdep.h"
 #include "os/xserver_poll.h"
 
@@ -235,11 +236,11 @@ ddxProcessArgument(int argc, char *argv[], int i)
             val = strtol(argv[i], &end, 0);
             if (*end == '\0') {
                 verbosity = val;
-                LogSetParameter(XLOG_VERBOSITY, verbosity);
+                xorgLogVerbosity = verbosity;
                 return 2;
             }
         }
-        LogSetParameter(XLOG_VERBOSITY, ++verbosity);
+        xorgLogVerbosity = ++verbosity;
         return 1;
     }
     else if (strcmp(argv[i], "-version") == 0) {

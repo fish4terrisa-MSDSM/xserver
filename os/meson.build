@@ -5,6 +5,7 @@ srcs_os = [
     'auth.c',
     'backtrace.c',
     'client.c',
+    'cmdline.c',
     'connection.c',
     'fmt.c',
     'inputthread.c',
@@ -21,6 +22,8 @@ srcs_os = [
     'xprintf.c',
     'log.c',
 ]
+
+conf_data.set('CONFIG_SYSLOG', cc.has_header('syslog.h') ? '1' : false)
 
 # Wrapper code for missing C library functions. Note that conf_data contains either '1' or false.
 srcs_libc = []
