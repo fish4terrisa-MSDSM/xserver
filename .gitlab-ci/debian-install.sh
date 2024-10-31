@@ -77,6 +77,7 @@ apt-get install -y \
 	libxcb-util0-dev \
 	libxcb-xf86dri0-dev \
 	libxcb-xkb-dev \
+	libxcb-xinput-dev \
 	libxcb-xv0-dev \
 	libxcb1-dev \
 	libxdmcp-dev \
