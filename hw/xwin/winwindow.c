@@ -65,9 +65,7 @@ winCreateWindowRootless(WindowPtr pWin)
     winTrace("winCreateWindowRootless (%p)\n", pWin);
 #endif
 
-    WIN_UNWRAP(CreateWindow);
-    fResult = (*pScreen->CreateWindow) (pWin);
-    WIN_WRAP(CreateWindow, winCreateWindowRootless);
+    fResult = fbCreateWindow(pWin);
 
     pWinPriv->hRgn = NULL;
 
@@ -90,9 +88,7 @@ winDestroyWindowRootless(WindowPtr pWin)
     winTrace("winDestroyWindowRootless (%p)\n", pWin);
 #endif
 
-    WIN_UNWRAP(DestroyWindow);
-    fResult = (*pScreen->DestroyWindow) (pWin);
-    WIN_WRAP(DestroyWindow, winDestroyWindowRootless);
+    fbDestroyWindow(pWin);
 
     if (pWinPriv->hRgn != NULL) {
         DeleteObject(pWinPriv->hRgn);
@@ -119,9 +115,7 @@ winPositionWindowRootless(WindowPtr pWin, int x, int y)
     winTrace("winPositionWindowRootless (%p)\n", pWin);
 #endif
 
-    WIN_UNWRAP(PositionWindow);
-    fResult = (*pScreen->PositionWindow) (pWin, x, y);
-    WIN_WRAP(PositionWindow, winPositionWindowRootless);
+    fbPositionWindow(pWin, x, y);
 
     winUpdateRgnRootless(pWin);
 
@@ -143,9 +137,7 @@ winChangeWindowAttributesRootless(WindowPtr pWin, unsigned long mask)
     winTrace("winChangeWindowAttributesRootless (%p)\n", pWin);
 #endif
 
-    WIN_UNWRAP(ChangeWindowAttributes);
-    fResult = (*pScreen->ChangeWindowAttributes) (pWin, mask);
-    WIN_WRAP(ChangeWindowAttributes, winChangeWindowAttributesRootless);
+    fbChangeWindowAttributes(pWin, mask);
 
     winUpdateRgnRootless(pWin);
 
@@ -169,9 +161,7 @@ winUnmapWindowRootless(WindowPtr pWin)
     winTrace("winUnmapWindowRootless (%p)\n", pWin);
 #endif
 
-    WIN_UNWRAP(UnrealizeWindow);
-    fResult = (*pScreen->UnrealizeWindow) (pWin);
-    WIN_WRAP(UnrealizeWindow, winUnmapWindowRootless);
+    fbUnrealizeWindow(pWin);
 
     if (pWinPriv->hRgn != NULL) {
         DeleteObject(pWinPriv->hRgn);
@@ -199,9 +189,7 @@ winMapWindowRootless(WindowPtr pWin)
     winTrace("winMapWindowRootless (%p)\n", pWin);
 #endif
 
-    WIN_UNWRAP(RealizeWindow);
-    fResult = (*pScreen->RealizeWindow) (pWin);
-    WIN_WRAP(RealizeWindow, winMapWindowRootless);
+    fbRealizeWindow(pWin);
 
     winReshapeRootless(pWin);
 
@@ -221,9 +209,7 @@ winSetShapeRootless(WindowPtr pWin, int kind)
     winTrace("winSetShapeRootless (%p, %i)\n", pWin, kind);
 #endif
 
-    WIN_UNWRAP(SetShape);
-    (*pScreen->SetShape) (pWin, kind);
-    WIN_WRAP(SetShape, winSetShapeRootless);
+    fbSetShape(pWin, kind);
 
     winReshapeRootless(pWin);
     winUpdateRgnRootless(pWin);

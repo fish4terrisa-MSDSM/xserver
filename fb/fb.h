@@ -842,6 +842,12 @@ fbPolyFillRect(DrawablePtr pDrawable,
 
 #define fbFillPolygon miFillPolygon
 
+#define fbSetShape miSetShape
+
+#define fbMoveWindow miMoveWindow
+
+#define fbModifyPixmapHeader miModifyPixmapHeader
+
 /*
  * fbfillsp.c
  */
