@@ -42,9 +42,7 @@ typedef struct dri3_dmabuf_format {
 } dri3_dmabuf_format_rec, *dri3_dmabuf_format_ptr;
 
 typedef struct dri3_screen_priv {
-    CloseScreenProcPtr          CloseScreen;
     ConfigNotifyProcPtr         ConfigNotify;
-    DestroyWindowProcPtr        DestroyWindow;
 
     Bool                        formats_cached;
     CARD32                      num_formats;

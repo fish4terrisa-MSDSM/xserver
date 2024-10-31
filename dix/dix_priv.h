@@ -253,4 +253,57 @@ extern Bool explicit_display;
 extern Bool disableBackingStore;
 extern Bool enableBackingStore;
 
+/*
+ * @brief call screen's window destructors
+ * @see dixScreenHookWindowDestroy
+ * @param pWin the window thats being destroyed
+ * @result the ScreenRec's DestroyWindow() return value
+ *
+ * Call the pluggable window destructors that extensions might have registered on
+ * the screen, and finally call ScreenRec's DestroyWindow proc.
+ *
+ * Should only be called by DIX itself.
+ */
+int dixScreenRaiseWindowDestroy(WindowPtr pWin);
+
+/*
+ * @brief call screen's window position notification hooks
+ * @see dixScreenHookWindowPosition
+ * @param pWin the window to notify on
+ *
+ * Call the pluggable window position hooks that extensions might have registered on
+ * the screen, and finally call ScreenRec's PositionWindow proc.
+ *
+ * Should only be called by DIX itself.
+ */
+void dixScreenRaiseWindowPosition(WindowPtr pWin, uint32_t x, uint32_t y);
+
+/*
+ * @brief call screen's close hooks
+ * @see dixScreenHookClose
+ * @param pScreen the screen being closed
+ *
+ * Call the pluggable screen close hooks that extensions might have registered on
+ * the screen, and finally call ScreenRec's CloseScreen proc.
+ *
+ * Should only be called by DIX itself.
+ */
+void dixScreenRaiseClose(ScreenPtr pScreen);
+
+/*
+ * @brief call screen's PixmapDestroy hook
+ * @see dixScreenHookPixmapDestroy
+ * @param pPixmap the pixmap being destroyed
+ *
+ * Call the pluggable pixmap destroy pixmap hooks that extensions might have
+ * registered on the screen.
+ * Note that it's *only* called, when the pixmap is really being destroyed
+ * (instead of just unref'ed)
+ *
+ * Should only be called by DIX itself, by dixDestroyPixmap()
+ * It must be called *before* the ScreenRec->DestroyPixmap() is called, any
+ * only if the reference counter reaches 1.
+ */
+void dixScreenRaisePixmapDestroy(PixmapPtr pPixmap);
+
 #endif /* _XSERVER_DIX_PRIV_H */

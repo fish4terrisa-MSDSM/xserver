@@ -124,7 +124,8 @@ miModifyPixmapHeader(PixmapPtr pPixmap, int width, int height, int depth,
 static Bool
 miCloseScreen(ScreenPtr pScreen)
 {
-    return ((*pScreen->DestroyPixmap) ((PixmapPtr) pScreen->devPrivate));
+    dixDestroyPixmap((PixmapPtr) pScreen->devPrivate, 0);
+    return TRUE;
 }
 
 static Bool
@@ -264,7 +265,7 @@ miScreenInit(ScreenPtr pScreen, void *pbits,  /* pointer to screen bits */
     pScreen->SaveScreen = miSaveScreen;
     /* GetImage, GetSpans */
     pScreen->SourceValidate = miSourceValidate;
-    /* CreateWindow, DestroyWindow, PositionWindow, ChangeWindowAttributes */
+    /* CreateWindow, PositionWindow, ChangeWindowAttributes */
     /* RealizeWindow, UnrealizeWindow */
     pScreen->ValidateTree = miValidateTree;
     pScreen->PostValidateTree = (PostValidateTreeProcPtr) 0;

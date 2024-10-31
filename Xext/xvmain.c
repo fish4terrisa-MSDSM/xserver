@@ -141,9 +141,7 @@ static void WriteSwappedVideoNotifyEvent(xvEvent *, xvEvent *);
 static void WriteSwappedPortNotifyEvent(xvEvent *, xvEvent *);
 static Bool CreateResourceTypes(void);
 
-static Bool XvCloseScreen(ScreenPtr);
-static Bool XvDestroyPixmap(PixmapPtr);
-static Bool XvDestroyWindow(WindowPtr);
+static void XvScreenClose(ScreenPtr, void *arg);
 static void XvResetProc(ExtensionEntry *);
 static int XvdiDestroyGrab(void *, XID);
 static int XvdiDestroyEncoding(void *, XID);
@@ -152,6 +150,7 @@ static int XvdiDestroyPortNotify(void *, XID);
 static int XvdiDestroyVideoNotifyList(void *, XID);
 static int XvdiDestroyPort(void *, XID);
 static int XvdiSendVideoNotify(XvPortPtr, DrawablePtr, int);
+static void XvStopAdaptors(DrawablePtr pDrawable);
 
 /*
 ** XvExtensionInit
@@ -257,6 +256,16 @@ CreateResourceTypes(void)
 
 }
 
+static void XvWindowDestroy(ScreenPtr pScreen, WindowPtr pWin, void *arg)
+{
+    XvStopAdaptors(&pWin->drawable);
+}
+
+static void XvPixmapDestroy(ScreenPtr pScreen, PixmapPtr pPixmap, void *arg)
+{
+    XvStopAdaptors(&pPixmap->drawable);
+}
+
 int
 XvScreenInit(ScreenPtr pScreen)
 {
@@ -290,34 +299,26 @@ XvScreenInit(ScreenPtr pScreen)
 
     dixSetPrivate(&pScreen->devPrivates, XvScreenKey, pxvs);
 
-    pxvs->DestroyPixmap = pScreen->DestroyPixmap;
-    pxvs->DestroyWindow = pScreen->DestroyWindow;
-    pxvs->CloseScreen = pScreen->CloseScreen;
-
-    pScreen->DestroyPixmap = XvDestroyPixmap;
-    pScreen->DestroyWindow = XvDestroyWindow;
-    pScreen->CloseScreen = XvCloseScreen;
+    dixScreenHookWindowDestroy(pScreen, XvWindowDestroy, NULL);
+    dixScreenHookClose(pScreen, XvScreenClose, NULL);
+    dixScreenHookPixmapDestroy(pScreen, XvPixmapDestroy, NULL);
 
     return Success;
 }
 
-static Bool
-XvCloseScreen(ScreenPtr pScreen)
+static void XvScreenClose(ScreenPtr pScreen, void *arg)
 {
-
     XvScreenPtr pxvs;
 
     pxvs = (XvScreenPtr) dixLookupPrivate(&pScreen->devPrivates, XvScreenKey);
 
-    pScreen->DestroyPixmap = pxvs->DestroyPixmap;
-    pScreen->DestroyWindow = pxvs->DestroyWindow;
-    pScreen->CloseScreen = pxvs->CloseScreen;
+    dixScreenUnhookWindowDestroy(pScreen, XvWindowDestroy, NULL);
+    dixScreenUnhookClose(pScreen, XvScreenClose, NULL);
+    dixScreenUnhookPixmapDestroy(pScreen, XvPixmapDestroy, NULL);
 
     free(pxvs);
 
     dixSetPrivate(&pScreen->devPrivates, XvScreenKey, NULL);
-
-    return (*pScreen->CloseScreen) (pScreen);
 }
 
 static void
@@ -365,39 +366,6 @@ XvStopAdaptors(DrawablePtr pDrawable)
         }
         pa++;
     }
-}
-
-static Bool
-XvDestroyPixmap(PixmapPtr pPix)
-{
-    ScreenPtr pScreen = pPix->drawable.pScreen;
-    Bool status;
-
-    if (pPix->refcnt == 1)
-        XvStopAdaptors(&pPix->drawable);
-
-    SCREEN_PROLOGUE(pScreen, DestroyPixmap);
-    status = (*pScreen->DestroyPixmap) (pPix);
-    SCREEN_EPILOGUE(pScreen, DestroyPixmap, XvDestroyPixmap);
-
-    return status;
-
-}
-
-static Bool
-XvDestroyWindow(WindowPtr pWin)
-{
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-    Bool status;
-
-    XvStopAdaptors(&pWin->drawable);
-
-    SCREEN_PROLOGUE(pScreen, DestroyWindow);
-    status = (*pScreen->DestroyWindow) (pWin);
-    SCREEN_EPILOGUE(pScreen, DestroyWindow, XvDestroyWindow);
-
-    return status;
-
 }
 
 static int

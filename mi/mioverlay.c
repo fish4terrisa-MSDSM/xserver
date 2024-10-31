@@ -4,6 +4,7 @@
 #include <X11/X.h>
 
 #include "dix/cursor_priv.h"
+#include "dix/dix_priv.h"
 
 #include "scrnintstr.h"
 #include <X11/extensions/shapeproto.h>
@@ -46,7 +47,6 @@ typedef struct {
 typedef struct {
     CloseScreenProcPtr CloseScreen;
     CreateWindowProcPtr CreateWindow;
-    DestroyWindowProcPtr DestroyWindow;
     UnrealizeWindowProcPtr UnrealizeWindow;
     RealizeWindowProcPtr RealizeWindow;
     miOverlayTransFunc MakeTransparent;
@@ -69,7 +69,7 @@ static Bool CollectUnderlayChildrenRegions(WindowPtr, RegionPtr);
 
 static Bool miOverlayCloseScreen(ScreenPtr);
 static Bool miOverlayCreateWindow(WindowPtr);
-static Bool miOverlayDestroyWindow(WindowPtr);
+static void miOverlayWindowDestroy(ScreenPtr pScreen, WindowPtr, void *arg);
 static Bool miOverlayUnrealizeWindow(WindowPtr);
 static Bool miOverlayRealizeWindow(WindowPtr);
 static void miOverlayMarkWindow(WindowPtr);
@@ -126,6 +126,7 @@ miInitOverlay(ScreenPtr pScreen,
         return FALSE;
 
     dixSetPrivate(&pScreen->devPrivates, miOverlayScreenKey, pScreenPriv);
+    dixScreenHookWindowDestroy(pScreen, miOverlayWindowDestroy, NULL);
 
     pScreenPriv->InOverlay = inOverlayFunc;
     pScreenPriv->MakeTransparent = transFunc;
@@ -133,13 +134,11 @@ miInitOverlay(ScreenPtr pScreen,
 
     pScreenPriv->CloseScreen = pScreen->CloseScreen;
     pScreenPriv->CreateWindow = pScreen->CreateWindow;
-    pScreenPriv->DestroyWindow = pScreen->DestroyWindow;
     pScreenPriv->UnrealizeWindow = pScreen->UnrealizeWindow;
     pScreenPriv->RealizeWindow = pScreen->RealizeWindow;
 
     pScreen->CloseScreen = miOverlayCloseScreen;
     pScreen->CreateWindow = miOverlayCreateWindow;
-    pScreen->DestroyWindow = miOverlayDestroyWindow;
     pScreen->UnrealizeWindow = miOverlayUnrealizeWindow;
     pScreen->RealizeWindow = miOverlayRealizeWindow;
 
@@ -164,10 +163,10 @@ static Bool
 miOverlayCloseScreen(ScreenPtr pScreen)
 {
     miOverlayScreenPtr pScreenPriv = MIOVERLAY_GET_SCREEN_PRIVATE(pScreen);
+    dixScreenUnhookWindowDestroy(pScreen, miOverlayWindowDestroy, NULL);
 
     pScreen->CloseScreen = pScreenPriv->CloseScreen;
     pScreen->CreateWindow = pScreenPriv->CreateWindow;
-    pScreen->DestroyWindow = pScreenPriv->DestroyWindow;
     pScreen->UnrealizeWindow = pScreenPriv->UnrealizeWindow;
     pScreen->RealizeWindow = pScreenPriv->RealizeWindow;
 
@@ -226,13 +225,10 @@ miOverlayCreateWindow(WindowPtr pWin)
     return TRUE;
 }
 
-static Bool
-miOverlayDestroyWindow(WindowPtr pWin)
+static void
+miOverlayWindowDestroy(ScreenPtr pScreen, WindowPtr pWin, void *arg)
 {
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-    miOverlayScreenPtr pScreenPriv = MIOVERLAY_GET_SCREEN_PRIVATE(pScreen);
     miOverlayTreePtr pTree = MIOVERLAY_GET_WINDOW_TREE(pWin);
-    Bool result = TRUE;
 
     if (pTree) {
         if (pTree->prevSib)
@@ -249,14 +245,6 @@ miOverlayDestroyWindow(WindowPtr pWin)
         RegionUninit(&(pTree->clipList));
         free(pTree);
     }
-
-    if (pScreenPriv->DestroyWindow) {
-        pScreen->DestroyWindow = pScreenPriv->DestroyWindow;
-        result = (*pScreen->DestroyWindow) (pWin);
-        pScreen->DestroyWindow = miOverlayDestroyWindow;
-    }
-
-    return result;
 }
 
 static Bool
@@ -945,7 +933,7 @@ miOverlayMoveWindow(WindowPtr pWin,
     SetWinSize(pWin);
     SetBorderSize(pWin);
 
-    (*pScreen->PositionWindow) (pWin, x, y);
+    dixScreenRaiseWindowPosition(pWin, x, y);
 
     windowToValidate = MoveWindowInStack(pWin, pNextSib);
 
@@ -1198,7 +1186,7 @@ miOverlayResizeWindow(WindowPtr pWin,
     ResizeChildrenWinSize(pWin, x - oldx, y - oldy, dw, dh);
 
     /* let the hardware adjust background and border pixmaps, if any */
-    (*pScreen->PositionWindow) (pWin, x, y);
+    dixScreenRaiseWindowPosition(pWin, x, y);
 
     pFirstChange = MoveWindowInStack(pWin, pSib);
 

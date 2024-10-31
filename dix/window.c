@@ -670,7 +670,8 @@ InitRootWindow(WindowPtr pWin)
 
     if (!(*pScreen->CreateWindow) (pWin))
         return;                 /* XXX */
-    (*pScreen->PositionWindow) (pWin, 0, 0);
+
+    dixScreenRaiseWindowPosition(pWin, 0, 0);
 
     pWin->cursorIsNone = FALSE;
     pWin->optional->cursor = RefCursor(rootCursor);
@@ -928,7 +929,7 @@ CreateWindow(Window wid, WindowPtr pParent, int x, int y, unsigned w,
         return NullWindow;
     }
     /* We SHOULD check for an error value here XXX */
-    (*pScreen->PositionWindow) (pWin, pWin->drawable.x, pWin->drawable.y);
+    dixScreenRaiseWindowPosition(pWin, pWin->drawable.x, pWin->drawable.y);
 
     if (!(vmask & CWEventMask))
         RecalculateDeliverableEvents(pWin);
@@ -998,8 +999,6 @@ DisposeWindowOptional(WindowPtr pWin)
 static void
 FreeWindowResources(WindowPtr pWin)
 {
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
     DeleteWindowFromAnySaveSet(pWin);
     DeleteWindowFromAnySelections(pWin);
     DeleteWindowFromAnyEvents(pWin, TRUE);
@@ -1014,13 +1013,14 @@ FreeWindowResources(WindowPtr pWin)
     if (wInputShape(pWin))
         RegionDestroy(wInputShape(pWin));
     if (pWin->borderIsPixel == FALSE)
-        (*pScreen->DestroyPixmap) (pWin->border.pixmap);
+        dixDestroyPixmap(pWin->border.pixmap, 0);
     if (pWin->backgroundState == BackgroundPixmap)
-        (*pScreen->DestroyPixmap) (pWin->background.pixmap);
+        dixDestroyPixmap(pWin->background.pixmap, 0);
 
     DeleteAllWindowProperties(pWin);
+
     /* We SHOULD check for an error value here XXX */
-    (*pScreen->DestroyWindow) (pWin);
+    dixScreenRaiseWindowDestroy(pWin);
     DisposeWindowOptional(pWin);
 }
 
@@ -1195,7 +1195,7 @@ ChangeWindowAttributes(WindowPtr pWin, Mask vmask, XID *vlist, ClientPtr client)
                 borderRelative = TRUE;
             if (pixID == None) {
                 if (pWin->backgroundState == BackgroundPixmap)
-                    (*pScreen->DestroyPixmap) (pWin->background.pixmap);
+                    dixDestroyPixmap(pWin->background.pixmap, 0);
                 if (!pWin->parent)
                     SetRootWindowBackground(pWin, pScreen, &index2);
                 else {
@@ -1210,7 +1210,7 @@ ChangeWindowAttributes(WindowPtr pWin, Mask vmask, XID *vlist, ClientPtr client)
                     goto PatchUp;
                 }
                 if (pWin->backgroundState == BackgroundPixmap)
-                    (*pScreen->DestroyPixmap) (pWin->background.pixmap);
+                    dixDestroyPixmap(pWin->background.pixmap, 0);
                 if (!pWin->parent)
                     SetRootWindowBackground(pWin, pScreen, &index2);
                 else
@@ -1229,7 +1229,7 @@ ChangeWindowAttributes(WindowPtr pWin, Mask vmask, XID *vlist, ClientPtr client)
                         goto PatchUp;
                     }
                     if (pWin->backgroundState == BackgroundPixmap)
-                        (*pScreen->DestroyPixmap) (pWin->background.pixmap);
+                        dixDestroyPixmap(pWin->background.pixmap, 0);
                     pWin->backgroundState = BackgroundPixmap;
                     pWin->background.pixmap = pPixmap;
                     pPixmap->refcnt++;
@@ -1245,7 +1245,7 @@ ChangeWindowAttributes(WindowPtr pWin, Mask vmask, XID *vlist, ClientPtr client)
             if (pWin->backgroundState == ParentRelative)
                 borderRelative = TRUE;
             if (pWin->backgroundState == BackgroundPixmap)
-                (*pScreen->DestroyPixmap) (pWin->background.pixmap);
+                dixDestroyPixmap(pWin->background.pixmap, 0);
             pWin->backgroundState = BackgroundPixel;
             pWin->background.pixel = (CARD32) *pVlist;
             /* background pixel overrides background pixmap,
@@ -1264,7 +1264,7 @@ ChangeWindowAttributes(WindowPtr pWin, Mask vmask, XID *vlist, ClientPtr client)
                 }
                 if (pWin->parent->borderIsPixel == TRUE) {
                     if (pWin->borderIsPixel == FALSE)
-                        (*pScreen->DestroyPixmap) (pWin->border.pixmap);
+                        dixDestroyPixmap(pWin->border.pixmap, 0);
                     pWin->border = pWin->parent->border;
                     pWin->borderIsPixel = TRUE;
                     index2 = CWBorderPixel;
@@ -1283,7 +1283,7 @@ ChangeWindowAttributes(WindowPtr pWin, Mask vmask, XID *vlist, ClientPtr client)
                     goto PatchUp;
                 }
                 if (pWin->borderIsPixel == FALSE)
-                    (*pScreen->DestroyPixmap) (pWin->border.pixmap);
+                    dixDestroyPixmap(pWin->border.pixmap, 0);
                 pWin->borderIsPixel = FALSE;
                 pWin->border.pixmap = pPixmap;
                 pPixmap->refcnt++;
@@ -1296,7 +1296,7 @@ ChangeWindowAttributes(WindowPtr pWin, Mask vmask, XID *vlist, ClientPtr client)
             break;
         case CWBorderPixel:
             if (pWin->borderIsPixel == FALSE)
-                (*pScreen->DestroyPixmap) (pWin->border.pixmap);
+                dixDestroyPixmap(pWin->border.pixmap, 0);
             pWin->borderIsPixel = TRUE;
             pWin->border.pixel = (CARD32) *pVlist;
             /* border pixel overrides border pixmap,
@@ -1849,11 +1849,8 @@ GravityTranslate(int x, int y, int oldx, int oldy,
 void
 ResizeChildrenWinSize(WindowPtr pWin, int dx, int dy, int dw, int dh)
 {
-    ScreenPtr pScreen;
     WindowPtr pSib, pChild;
     Bool resized = (dw || dh);
-
-    pScreen = pWin->drawable.pScreen;
 
     for (pSib = pWin->firstChild; pSib; pSib = pSib->nextSib) {
         if (resized && (pSib->winGravity > NorthWestGravity)) {
@@ -1879,7 +1876,8 @@ ResizeChildrenWinSize(WindowPtr pWin, int dx, int dy, int dw, int dh)
         pSib->drawable.y = pWin->drawable.y + pSib->origin.y;
         SetWinSize(pSib);
         SetBorderSize(pSib);
-        (*pScreen->PositionWindow) (pSib, pSib->drawable.x, pSib->drawable.y);
+
+        dixScreenRaiseWindowPosition(pSib, pSib->drawable.x, pSib->drawable.y);
 
         if ((pChild = pSib->firstChild)) {
             while (1) {
@@ -1889,9 +1887,9 @@ ResizeChildrenWinSize(WindowPtr pWin, int dx, int dy, int dw, int dh)
                     pChild->origin.y;
                 SetWinSize(pChild);
                 SetBorderSize(pChild);
-                (*pScreen->PositionWindow) (pChild,
-                                            pChild->drawable.x,
-                                            pChild->drawable.y);
+                dixScreenRaiseWindowPosition(pChild,
+                                             pChild->drawable.x,
+                                             pChild->drawable.y);
                 if (pChild->firstChild) {
                     pChild = pChild->firstChild;
                     continue;
@@ -2585,7 +2583,8 @@ ReparentWindow(WindowPtr pWin, WindowPtr pParent,
 
     if (pScreen->ReparentWindow)
         (*pScreen->ReparentWindow) (pWin, pPriorParent);
-    (*pScreen->PositionWindow) (pWin, pWin->drawable.x, pWin->drawable.y);
+
+    dixScreenRaiseWindowPosition(pWin, pWin->drawable.x, pWin->drawable.y);
     ResizeChildrenWinSize(pWin, 0, 0, 0, 0);
 
     CheckWindowOptionalNeed(pWin);

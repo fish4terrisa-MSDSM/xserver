@@ -96,9 +96,7 @@ exaCreatePixmap_classic(ScreenPtr pScreen, int w, int h, int depth,
     pExaPixmap->fb_size = pExaPixmap->fb_pitch * h;
 
     if (pExaPixmap->fb_pitch > 131071) {
-        swap(pExaScr, pScreen, DestroyPixmap);
-        pScreen->DestroyPixmap(pPixmap);
-        swap(pExaScr, pScreen, DestroyPixmap);
+        dixDestroyPixmap(pPixmap, 0);
         return NULL;
     }
 
@@ -108,9 +106,7 @@ exaCreatePixmap_classic(ScreenPtr pScreen, int w, int h, int depth,
                                        pScreen, pPixmap);
 
     if (pExaPixmap->pDamage == NULL) {
-        swap(pExaScr, pScreen, DestroyPixmap);
-        pScreen->DestroyPixmap(pPixmap);
-        swap(pExaScr, pScreen, DestroyPixmap);
+        dixDestroyPixmap(pPixmap, 0);
         return NULL;
     }
 
@@ -206,38 +202,26 @@ exaModifyPixmapHeader_classic(PixmapPtr pPixmap, int width, int height,
     return ret;
 }
 
-Bool
-exaDestroyPixmap_classic(PixmapPtr pPixmap)
+void exaPixmapDestroy_classic(ScreenPtr pScreen, PixmapPtr pPixmap, void *arg)
 {
-    ScreenPtr pScreen = pPixmap->drawable.pScreen;
+    ExaPixmapPriv(pPixmap);
+    if (!pExaPixmap) // we're called on an error path
+        return;
 
-    ExaScreenPriv(pScreen);
-    Bool ret;
+    exaDestroyPixmap(pPixmap);
 
-    if (pPixmap->refcnt == 1) {
-        ExaPixmapPriv(pPixmap);
-
-        exaDestroyPixmap(pPixmap);
-
-        if (pExaPixmap->area) {
-            DBG_PIXMAP(("-- 0x%p (0x%x) (%dx%d)\n",
-                        (void *) pPixmap->drawable.id,
-                        ExaGetPixmapPriv(pPixmap)->area->offset,
-                        pPixmap->drawable.width, pPixmap->drawable.height));
-            /* Free the offscreen area */
-            exaOffscreenFree(pPixmap->drawable.pScreen, pExaPixmap->area);
-            pPixmap->devPrivate.ptr = pExaPixmap->sys_ptr;
-            pPixmap->devKind = pExaPixmap->sys_pitch;
-        }
-        RegionUninit(&pExaPixmap->validSys);
-        RegionUninit(&pExaPixmap->validFB);
+    if (pExaPixmap->area) {
+        DBG_PIXMAP(("-- 0x%p (0x%x) (%dx%d)\n",
+                    (void *) pPixmap->drawable.id,
+                    ExaGetPixmapPriv(pPixmap)->area->offset,
+                    pPixmap->drawable.width, pPixmap->drawable.height));
+        /* Free the offscreen area */
+        exaOffscreenFree(pPixmap->drawable.pScreen, pExaPixmap->area);
+        pPixmap->devPrivate.ptr = pExaPixmap->sys_ptr;
+        pPixmap->devKind = pExaPixmap->sys_pitch;
     }
-
-    swap(pExaScr, pScreen, DestroyPixmap);
-    ret = pScreen->DestroyPixmap(pPixmap);
-    swap(pExaScr, pScreen, DestroyPixmap);
-
-    return ret;
+    RegionUninit(&pExaPixmap->validSys);
+    RegionUninit(&pExaPixmap->validFB);
 }
 
 Bool

@@ -63,13 +63,10 @@ PictureWindowFormat(WindowPtr pWindow)
                               WindowGetVisual(pWindow));
 }
 
-static Bool
-PictureDestroyWindow(WindowPtr pWindow)
+static void
+picture_window_destructor(ScreenPtr pScreen, WindowPtr pWindow, void *arg)
 {
-    ScreenPtr pScreen = pWindow->drawable.pScreen;
     PicturePtr pPicture;
-    PictureScreenPtr ps = GetPictureScreen(pScreen);
-    Bool ret;
 
     while ((pPicture = GetPictureWindow(pWindow))) {
         SetPictureWindow(pWindow, pPicture->pNext);
@@ -77,22 +74,13 @@ PictureDestroyWindow(WindowPtr pWindow)
             FreeResource(pPicture->id, PictureType);
         FreePicture((void *) pPicture, pPicture->id);
     }
-    pScreen->DestroyWindow = ps->DestroyWindow;
-    ret = (*pScreen->DestroyWindow) (pWindow);
-    ps->DestroyWindow = pScreen->DestroyWindow;
-    pScreen->DestroyWindow = PictureDestroyWindow;
-    return ret;
 }
 
-static Bool
-PictureCloseScreen(ScreenPtr pScreen)
+static void PictureScreenClose(ScreenPtr pScreen, void *arg)
 {
     PictureScreenPtr ps = GetPictureScreen(pScreen);
-    Bool ret;
     int n;
 
-    pScreen->CloseScreen = ps->CloseScreen;
-    ret = (*pScreen->CloseScreen) (pScreen);
     PictureResetFilters(pScreen);
     for (n = 0; n < ps->nformats; n++)
         if (ps->formats[n].type == PictTypeIndexed)
@@ -101,7 +89,6 @@ PictureCloseScreen(ScreenPtr pScreen)
     SetPictureScreen(pScreen, 0);
     free(ps->formats);
     free(ps);
-    return ret;
 }
 
 static void
@@ -692,12 +679,11 @@ PictureInit(ScreenPtr pScreen, PictFormatPtr formats, int nformats)
 
     ps->subpixel = SubPixelUnknown;
 
-    ps->CloseScreen = pScreen->CloseScreen;
-    ps->DestroyWindow = pScreen->DestroyWindow;
     ps->StoreColors = pScreen->StoreColors;
-    pScreen->DestroyWindow = PictureDestroyWindow;
-    pScreen->CloseScreen = PictureCloseScreen;
     pScreen->StoreColors = PictureStoreColors;
+
+    dixScreenHookWindowDestroy(pScreen, picture_window_destructor, NULL);
+    dixScreenHookClose(pScreen, PictureScreenClose, NULL);
 
     if (!PictureSetDefaultFilters(pScreen)) {
         PictureResetFilters(pScreen);
@@ -1416,7 +1402,7 @@ FreePicture(void *value, XID pid)
                 }
             }
             else if (pPicture->pDrawable->type == DRAWABLE_PIXMAP) {
-                (*pScreen->DestroyPixmap) ((PixmapPtr) pPicture->pDrawable);
+                dixDestroyPixmap((PixmapPtr) pPicture->pDrawable, 0);
             }
         }
         dixFreeObjectWithPrivates(pPicture, PRIVATE_PICTURE);

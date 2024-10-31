@@ -80,12 +80,6 @@ DbeStubScreen(DbeScreenPrivPtr pDbeScreenPriv, int *nStubbedScreens)
     /* Stub DIX. */
     pDbeScreenPriv->SetupBackgroundPainter = NULL;
 
-    /* Do not unwrap PositionWindow nor DestroyWindow.  If the DDX
-     * initialization function failed, we assume that it did not wrap
-     * PositionWindow.  Also, DestroyWindow is only wrapped if the DDX
-     * initialization function succeeded.
-     */
-
     /* Stub DDX. */
     pDbeScreenPriv->GetVisualInfo = NULL;
     pDbeScreenPriv->AllocBackBufferName = NULL;
@@ -1235,7 +1229,9 @@ DbeWindowPrivDelete(void *pDbeWinPriv, XID id)
     return Success;
 
 }                               /* DbeWindowPrivDelete() */
-
+
+static void miDbeWindowDestroy(ScreenPtr pScreen, WindowPtr pWin, void *closure);
+
 /******************************************************************************
  *
  * DBE DIX Procedure: DbeResetProc
@@ -1259,94 +1255,39 @@ DbeResetProc(ExtensionEntry * extEntry)
         pDbeScreenPriv = DBE_SCREEN_PRIV(pScreen);
 
         if (pDbeScreenPriv) {
-            /* Unwrap DestroyWindow, which was wrapped in DbeExtensionInit(). */
-            pScreen->DestroyWindow = pDbeScreenPriv->DestroyWindow;
-            pScreen->PositionWindow = pDbeScreenPriv->PositionWindow;
+            dixScreenUnhookWindowDestroy(pScreen, miDbeWindowDestroy, NULL);
+            dixScreenUnhookWindowPosition(pScreen, miDbeWindowPosition, NULL);
             free(pDbeScreenPriv);
         }
     }
-}                               /* DbeResetProc() */
-
-/******************************************************************************
- *
- * DBE DIX Procedure: DbeDestroyWindow
- *
- * Description:
- *
- *     This is the wrapper for pScreen->DestroyWindow.
- *     This function frees buffer resources for a window before it is
- *     destroyed.
- *
- *****************************************************************************/
+}
 
-static Bool
-DbeDestroyWindow(WindowPtr pWin)
+/**
+ * @brief window destroy callback
+ *
+ * Called by DIX when window is being destroyed.
+ *
+ */
+static void miDbeWindowDestroy(ScreenPtr pScreen, WindowPtr pWin, void *closure)
 {
-    DbeScreenPrivPtr pDbeScreenPriv;
-    DbeWindowPrivPtr pDbeWindowPriv;
-    ScreenPtr pScreen;
-    Bool ret;
-
     /*
      **************************************************************************
-     ** 1. Unwrap the member routine.
-     **************************************************************************
-     */
-
-    pScreen = pWin->drawable.pScreen;
-    pDbeScreenPriv = DBE_SCREEN_PRIV(pScreen);
-    pScreen->DestroyWindow = pDbeScreenPriv->DestroyWindow;
-
-    /*
-     **************************************************************************
-     ** 2. Do any work necessary before the member routine is called.
-     **
      **    Call the window priv delete function for all buffer IDs associated
      **    with this window.
      **************************************************************************
      */
 
-    if ((pDbeWindowPriv = DBE_WINDOW_PRIV(pWin))) {
-        while (pDbeWindowPriv) {
+    DbeWindowPrivPtr pDbeWindowPriv;
+    while ((pDbeWindowPriv = DBE_WINDOW_PRIV(pWin))) {
             /* *DbeWinPrivDelete() will free the window private and set it to
              * NULL if there are no more buffer IDs associated with this
              * window.
              */
             FreeResource(pDbeWindowPriv->IDs[0], X11_RESTYPE_NONE);
             pDbeWindowPriv = DBE_WINDOW_PRIV(pWin);
-        }
     }
+}
 
-    /*
-     **************************************************************************
-     ** 3. Call the member routine, saving its result if necessary.
-     **************************************************************************
-     */
-
-    ret = (*pScreen->DestroyWindow) (pWin);
-
-    /*
-     **************************************************************************
-     ** 4. Rewrap the member routine, restoring the wrapper value first in case
-     **    the wrapper (or something that it wrapped) change this value.
-     **************************************************************************
-     */
-
-    pDbeScreenPriv->DestroyWindow = pScreen->DestroyWindow;
-    pScreen->DestroyWindow = DbeDestroyWindow;
-
-    /*
-     **************************************************************************
-     ** 5. Do any work necessary after the member routine has been called.
-     **
-     **    In this case we do not need to do anything.
-     **************************************************************************
-     */
-
-    return ret;
-
-}                               /* DbeDestroyWindow() */
-
 /******************************************************************************
  *
  * DBE DIX Procedure: DbeExtensionInit
@@ -1429,12 +1370,10 @@ DbeExtensionInit(void)
             pDbeScreenPriv = DBE_SCREEN_PRIV(pScreen);
 
             if (ddxInitSuccess) {
-                /* Wrap DestroyWindow.  The DDX initialization function
-                 * already wrapped PositionWindow for us.
+                /* Hook in our window destructor. The DDX initialization function
+                 * already added WindowPosition hook for us.
                  */
-
-                pDbeScreenPriv->DestroyWindow = pScreen->DestroyWindow;
-                pScreen->DestroyWindow = DbeDestroyWindow;
+                dixScreenHookWindowDestroy(pScreen, miDbeWindowDestroy, NULL);
             }
             else {
                 /* DDX initialization failed.  Stub the screen. */

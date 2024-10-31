@@ -485,7 +485,6 @@ typedef struct _winPrivScreenRec {
     winInitVisualsProcPtr pwinInitVisuals;
     winAdjustVideoModeProcPtr pwinAdjustVideoMode;
     winCreateBoundingWindowProcPtr pwinCreateBoundingWindow;
-    winFinishScreenInitProcPtr pwinFinishScreenInit;
     winBltExposedRegionsProcPtr pwinBltExposedRegions;
     winBltExposedWindowRegionProcPtr pwinBltExposedWindowRegion;
     winActivateAppProcPtr pwinActivateApp;
@@ -500,23 +499,10 @@ typedef struct _winPrivScreenRec {
     winCreateScreenResourcesProc pwinCreateScreenResources;
 
     /* Window Procedures for Rootless mode */
-    CreateWindowProcPtr CreateWindow;
-    DestroyWindowProcPtr DestroyWindow;
-    PositionWindowProcPtr PositionWindow;
-    ChangeWindowAttributesProcPtr ChangeWindowAttributes;
-    RealizeWindowProcPtr RealizeWindow;
-    UnrealizeWindowProcPtr UnrealizeWindow;
     ValidateTreeProcPtr ValidateTree;
     PostValidateTreeProcPtr PostValidateTree;
-    CopyWindowProcPtr CopyWindow;
     ClearToBackgroundProcPtr ClearToBackground;
     ClipNotifyProcPtr ClipNotify;
-    RestackWindowProcPtr RestackWindow;
-    ReparentWindowProcPtr ReparentWindow;
-    ResizeWindowProcPtr ResizeWindow;
-    MoveWindowProcPtr MoveWindow;
-    SetShapeProcPtr SetShape;
-    ModifyPixmapHeaderProcPtr ModifyPixmapHeader;
 
     winCursorRec cursor;
 
@@ -835,9 +821,6 @@ void
 Bool
  winScreenInit(ScreenPtr pScreen, int argc, char **argv);
 
-Bool
- winFinishScreenInitFB(int i, ScreenPtr pScreen, int argc, char **argv);
-
 /*
  * winshadddnl.c
  */
@@ -929,18 +912,8 @@ void
  winReorderWindowsMultiWindow(void);
 
 void
-
-winResizeWindowMultiWindow(WindowPtr pWin, int x, int y, unsigned int w,
-                           unsigned int h, WindowPtr pSib);
-void
-
 winMoveWindowMultiWindow(WindowPtr pWin, int x, int y,
                          WindowPtr pSib, VTKind kind);
-
-void
-
-winCopyWindowMultiWindow(WindowPtr pWin, DDXPointRec oldpt,
-                         RegionPtr oldRegion);
 
 PixmapPtr
 winCreatePixmapMultiwindow(ScreenPtr pScreen, int width, int height, int depth,

@@ -317,7 +317,7 @@ damage_report(DamagePtr pDamage, RegionPtr pRegion, void *data)
 
     window_pixmap = xwl_screen->screen->GetWindowPixmap(xwl_window->surface_window);
     if (xwl_is_client_pixmap(window_pixmap))
-        xwl_screen->screen->DestroyPixmap(xwl_window_swap_pixmap(xwl_window, FALSE));
+        dixDestroyPixmap(xwl_window_swap_pixmap(xwl_window, FALSE), 0);
 }
 
 static void
@@ -1939,31 +1939,17 @@ xwl_window_create_frame_callback(struct xwl_window *xwl_window)
         xwl_present_for_each_frame_callback(xwl_window, xwl_present_reset_timer);
 }
 
-Bool
-xwl_destroy_window(WindowPtr window)
+void
+xwl_window_destroy(ScreenPtr pScreen, WindowPtr window, void *arg)
 {
-    ScreenPtr screen = window->drawable.pScreen;
-    struct xwl_screen *xwl_screen = xwl_screen_get(screen);
+    struct xwl_screen *xwl_screen = xwl_screen_get(pScreen);
     struct xwl_window *xwl_window = xwl_window_get(window);
-    Bool ret;
 
     if (xwl_screen->present)
         xwl_present_cleanup(window);
 
     if (xwl_window)
         xwl_window_dispose(xwl_window);
-
-    screen->DestroyWindow = xwl_screen->DestroyWindow;
-
-    if (screen->DestroyWindow)
-        ret = screen->DestroyWindow (window);
-    else
-        ret = TRUE;
-
-    xwl_screen->DestroyWindow = screen->DestroyWindow;
-    screen->DestroyWindow = xwl_destroy_window;
-
-    return ret;
 }
 
 static Bool

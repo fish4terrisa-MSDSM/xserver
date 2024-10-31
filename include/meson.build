@@ -438,6 +438,7 @@ if with_dtrace
     dtrace_hdr += dtrace_header.process(dtrace_tmpl)
 endif
 
+# install SDK headers
 if build_xorg
     install_data(
         [
@@ -451,6 +452,7 @@ if build_xorg
             'cursor.h',
             'cursorstr.h',
             'dix.h',
+            'dix_screen_hooks.h',
             'dixaccess.h',
             'dixevents.h',
             'dixfont.h',
