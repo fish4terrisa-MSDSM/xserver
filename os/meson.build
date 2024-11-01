@@ -60,6 +60,15 @@ endif
 os_dep = []
 os_c_args = []
 
+# eg. struct msghdr -> msg_control 
+if host_machine.system() == 'sunos'
+    os_c_args += '-D_XOPEN_SOURCE=700'
+    os_c_args += '-D_XOPEN_SOURCE_EXTENDED=1'
+    os_c_args += '-D__EXTENSIONS__'
+    os_dep += cc.find_library('socket')
+    os_dep += cc.find_library('nsl')
+endif
+
 if get_option('xres')
     # Only the XRes extension cares about the client ID.
     os_c_args += '-DCLIENTIDS'
