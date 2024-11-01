@@ -1557,7 +1557,7 @@ int
 ProcCreateGC(ClientPtr client)
 {
     int error, rc;
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
     unsigned len;
 
@@ -1574,7 +1574,7 @@ ProcCreateGC(ClientPtr client)
     len = client->req_len - bytes_to_int32(sizeof(xCreateGCReq));
     if (len != Ones(stuff->mask))
         return BadLength;
-    pGC = (GC *) CreateGC(pDraw, stuff->mask, (XID *) &stuff[1], &error,
+    pGC = (GCPtr) CreateGC(pDraw, stuff->mask, (XID *) &stuff[1], &error,
                           stuff->gc, client);
     if (error != Success)
         return error;
@@ -1586,7 +1586,7 @@ ProcCreateGC(ClientPtr client)
 int
 ProcChangeGC(ClientPtr client)
 {
-    GC *pGC;
+    GCPtr pGC;
     int result;
     unsigned len;
 
@@ -1607,8 +1607,8 @@ ProcChangeGC(ClientPtr client)
 int
 ProcCopyGC(ClientPtr client)
 {
-    GC *dstGC;
-    GC *pGC;
+    GCPtr dstGC;
+    GCPtr pGC;
     int result;
 
     REQUEST(xCopyGCReq);
@@ -1632,7 +1632,7 @@ ProcCopyGC(ClientPtr client)
 int
 ProcSetDashes(ClientPtr client)
 {
-    GC *pGC;
+    GCPtr pGC;
     int result;
 
     REQUEST(xSetDashesReq);
@@ -1658,7 +1658,7 @@ int
 ProcSetClipRectangles(ClientPtr client)
 {
     int nr, result;
-    GC *pGC;
+    GCPtr pGC;
 
     REQUEST(xSetClipRectanglesReq);
 
@@ -1683,7 +1683,7 @@ ProcSetClipRectangles(ClientPtr client)
 int
 ProcFreeGC(ClientPtr client)
 {
-    GC *pGC;
+    GCPtr pGC;
     int rc;
 
     REQUEST(xResourceReq);
@@ -1773,7 +1773,7 @@ ProcCopyArea(ClientPtr client)
 {
     DrawablePtr pDst;
     DrawablePtr pSrc;
-    GC *pGC;
+    GCPtr pGC;
 
     REQUEST(xCopyAreaReq);
     RegionPtr pRgn;
@@ -1811,7 +1811,7 @@ int
 ProcCopyPlane(ClientPtr client)
 {
     DrawablePtr psrcDraw, pdstDraw;
-    GC *pGC;
+    GCPtr pGC;
 
     REQUEST(xCopyPlaneReq);
     RegionPtr pRgn;
@@ -1857,7 +1857,7 @@ int
 ProcPolyPoint(ClientPtr client)
 {
     int npoint;
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
 
     REQUEST(xPolyPointReq);
@@ -1880,7 +1880,7 @@ int
 ProcPolyLine(ClientPtr client)
 {
     int npoint;
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
 
     REQUEST(xPolyLineReq);
@@ -1903,7 +1903,7 @@ int
 ProcPolySegment(ClientPtr client)
 {
     int nsegs;
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
 
     REQUEST(xPolySegmentReq);
@@ -1923,7 +1923,7 @@ int
 ProcPolyRectangle(ClientPtr client)
 {
     int nrects;
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
 
     REQUEST(xPolyRectangleReq);
@@ -1944,7 +1944,7 @@ int
 ProcPolyArc(ClientPtr client)
 {
     int narcs;
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
 
     REQUEST(xPolyArcReq);
@@ -1964,7 +1964,7 @@ int
 ProcFillPoly(ClientPtr client)
 {
     int things;
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
 
     REQUEST(xFillPolyReq);
@@ -1994,7 +1994,7 @@ int
 ProcPolyFillRectangle(ClientPtr client)
 {
     int things;
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
 
     REQUEST(xPolyFillRectangleReq);
@@ -2016,7 +2016,7 @@ int
 ProcPolyFillArc(ClientPtr client)
 {
     int narcs;
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
 
     REQUEST(xPolyFillArcReq);
@@ -2089,7 +2089,7 @@ ReformatImage(char *base, int nbytes, int bpp, int order)
 int
 ProcPutImage(ClientPtr client)
 {
-    GC *pGC;
+    GCPtr pGC;
     DrawablePtr pDraw;
     long length;                /* length of scanline server padded */
     long lengthProto;           /* length of scanline protocol padded */
@@ -2360,7 +2360,7 @@ ProcPolyText(ClientPtr client)
 
     REQUEST(xPolyTextReq);
     DrawablePtr pDraw;
-    GC *pGC;
+    GCPtr pGC;
 
     REQUEST_AT_LEAST_SIZE(xPolyTextReq);
     VALIDATE_DRAWABLE_AND_GC(stuff->drawable, pDraw, DixWriteAccess);
@@ -2384,7 +2384,7 @@ ProcImageText8(ClientPtr client)
 {
     int err;
     DrawablePtr pDraw;
-    GC *pGC;
+    GCPtr pGC;
 
     REQUEST(xImageTextReq);
 
@@ -2410,7 +2410,7 @@ ProcImageText16(ClientPtr client)
 {
     int err;
     DrawablePtr pDraw;
-    GC *pGC;
+    GCPtr pGC;
 
     REQUEST(xImageTextReq);
 
