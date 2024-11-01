@@ -115,6 +115,9 @@ typedef struct _modesettingRec {
 
     drmmode_rec drmmode;
 
+    /* For dri3 */
+    char *render_node;
+
     drmEventContext event_context;
 
     /**
@@ -221,6 +224,9 @@ uint64_t ms_kernel_msc_to_crtc_msc(xf86CrtcPtr crtc, uint64_t sequence, Bool is6
 
 Bool ms_dri2_screen_init(ScreenPtr screen);
 void ms_dri2_close_screen(ScreenPtr screen);
+
+Bool ms_dri3_screen_init(ScreenPtr screen);
+void ms_dri3_close_screen(ScreenPtr screen);
 
 Bool ms_vblank_screen_init(ScreenPtr screen);
 void ms_vblank_close_screen(ScreenPtr screen);

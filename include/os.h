@@ -308,6 +308,9 @@ xstrcasestr(const char *s, const char *find);
 #ifndef HAVE_STRLCPY
 extern _X_EXPORT size_t
 strlcpy(char *dst, const char *src, size_t siz);
+#endif
+
+#ifndef HAVE_STRLCAT
 extern _X_EXPORT size_t
 strlcat(char *dst, const char *src, size_t siz);
 #endif
