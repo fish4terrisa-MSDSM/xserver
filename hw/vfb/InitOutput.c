@@ -130,6 +130,7 @@ typedef enum { NORMAL_MEMORY_FB, SHARED_MEMORY_FB, MMAPPED_FILE_FB } fbMemType;
 static fbMemType fbmemtype = NORMAL_MEMORY_FB;
 static char needswap = 0;
 static Bool Render = TRUE;
+static int verbose = 0;
 
 #define swapcopy16(_dst, _src) \
     if (needswap) { CARD16 _s = _src; cpswaps(_s, _dst); } \
@@ -245,6 +246,7 @@ ddxInputThreadInit(void)
 void
 ddxUseMsg(void)
 {
+    ErrorF("-verbose [n]           verbose startup messages\n");
     ErrorF("-screen scrn WxHxD     set screen's width, height, depth\n");
     ErrorF("-pixdepths list-of-int support given pixmap depths\n");
     ErrorF("+/-render		   turn on/off RENDER extension support"
@@ -263,6 +265,16 @@ ddxUseMsg(void)
 #endif
 }
 
+static int
+vfbSetVerbosity(int verb)
+{
+    int save = verbose;
+
+    verbose = verb;
+    LogSetParameter(XLOG_VERBOSITY, verb);
+    return save;
+}
+
 int
 ddxProcessArgument(int argc, char *argv[], int i)
 {
@@ -273,6 +285,21 @@ ddxProcessArgument(int argc, char *argv[], int i)
     if (firstTime) {
         vfbInitializePixmapDepths();
         firstTime = FALSE;
+    }
+
+    if (!strcmp(argv[i], "-verbose")) {
+        if (++i < argc && argv[i]) {
+            char *end;
+            long val;
+
+            val = strtol(argv[i], &end, 0);
+            if (*end == '\0') {
+                vfbSetVerbosity(val);
+                return 2;
+            }
+        }
+        vfbSetVerbosity(++verbose);
+        return 1;
     }
 
     if (lastScreen == -1)
