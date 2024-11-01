@@ -403,10 +403,9 @@ ProcPseudoramiXDispatch(ClientPtr client)
 static int
 SProcPseudoramiXQueryVersion(ClientPtr client)
 {
-    REQUEST(xPanoramiXQueryVersionReq);
-
     TRACE;
 
+    REQUEST(xPanoramiXQueryVersionReq);
     swaps(&stuff->length);
     REQUEST_SIZE_MATCH(xPanoramiXQueryVersionReq);
     return ProcPseudoramiXQueryVersion(client);
@@ -415,10 +414,9 @@ SProcPseudoramiXQueryVersion(ClientPtr client)
 static int
 SProcPseudoramiXGetState(ClientPtr client)
 {
-    REQUEST(xPanoramiXGetStateReq);
-
     TRACE;
 
+    REQUEST(xPanoramiXGetStateReq);
     swaps(&stuff->length);
     REQUEST_SIZE_MATCH(xPanoramiXGetStateReq);
     return ProcPseudoramiXGetState(client);
@@ -427,10 +425,9 @@ SProcPseudoramiXGetState(ClientPtr client)
 static int
 SProcPseudoramiXGetScreenCount(ClientPtr client)
 {
-    REQUEST(xPanoramiXGetScreenCountReq);
-
     TRACE;
 
+    REQUEST(xPanoramiXGetScreenCountReq);
     swaps(&stuff->length);
     REQUEST_SIZE_MATCH(xPanoramiXGetScreenCountReq);
     return ProcPseudoramiXGetScreenCount(client);
@@ -439,10 +436,9 @@ SProcPseudoramiXGetScreenCount(ClientPtr client)
 static int
 SProcPseudoramiXGetScreenSize(ClientPtr client)
 {
-    REQUEST(xPanoramiXGetScreenSizeReq);
-
     TRACE;
 
+    REQUEST(xPanoramiXGetScreenSizeReq);
     swaps(&stuff->length);
     REQUEST_SIZE_MATCH(xPanoramiXGetScreenSizeReq);
     return ProcPseudoramiXGetScreenSize(client);
@@ -451,10 +447,9 @@ SProcPseudoramiXGetScreenSize(ClientPtr client)
 static int
 SProcPseudoramiXIsActive(ClientPtr client)
 {
-    REQUEST(xXineramaIsActiveReq);
-
     TRACE;
 
+    REQUST(xXineramaIsActiveReq);
     swaps(&stuff->length);
     REQUEST_SIZE_MATCH(xXineramaIsActiveReq);
     return ProcPseudoramiXIsActive(client);
@@ -463,10 +458,9 @@ SProcPseudoramiXIsActive(ClientPtr client)
 static int
 SProcPseudoramiXQueryScreens(ClientPtr client)
 {
-    REQUEST(xXineramaQueryScreensReq);
-
     TRACE;
 
+    REQUEST(xXineramaQueryScreensReq);
     swaps(&stuff->length);
     REQUEST_SIZE_MATCH(xXineramaQueryScreensReq);
     return ProcPseudoramiXQueryScreens(client);
