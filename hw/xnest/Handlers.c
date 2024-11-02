@@ -23,8 +23,6 @@ is" without express or implied warranty.
 #include "windowstr.h"
 #include "servermd.h"
 
-#include "Xnest.h"
-
 #include "Display.h"
 #include "Events.h"
 #include "Handlers.h"
@@ -32,8 +30,7 @@ is" without express or implied warranty.
 void
 xnestBlockHandler(void *blockData, void *timeout)
 {
-    xnestCollectExposures();
-    XFlush(xnestDisplay);
+    xnestCollectEvents();
 }
 
 void

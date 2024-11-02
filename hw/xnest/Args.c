@@ -26,30 +26,26 @@ is" without express or implied warranty.
 #include "scrnintstr.h"
 #include "servermd.h"
 
-#include "Xnest.h"
+#include "xnest-xcb.h"
 
 #include "Display.h"
 #include "Args.h"
 
 char *xnestDisplayName = NULL;
-Bool xnestSynchronize = FALSE;
 Bool xnestFullGeneration = FALSE;
 int xnestDefaultClass;
 Bool xnestUserDefaultClass = FALSE;
 int xnestDefaultDepth;
 Bool xnestUserDefaultDepth = FALSE;
 Bool xnestSoftwareScreenSaver = FALSE;
-int xnestX;
-int xnestY;
-unsigned int xnestWidth;
-unsigned int xnestHeight;
+xRectangle xnestGeometry = { 0 };
 int xnestUserGeometry = 0;
 int xnestBorderWidth;
 Bool xnestUserBorderWidth = FALSE;
 char *xnestWindowName = NULL;
 int xnestNumScreens = 0;
 Bool xnestDoDirectColormaps = FALSE;
-Window xnestParentWindow = 0;
+xcb_window_t xnestParentWindow = 0;
 
 int
 ddxProcessArgument(int argc, char *argv[], int i)
@@ -60,10 +56,6 @@ ddxProcessArgument(int argc, char *argv[], int i)
             return 2;
         }
         return 0;
-    }
-    if (!strcmp(argv[i], "-sync")) {
-        xnestSynchronize = TRUE;
-        return 1;
     }
     if (!strcmp(argv[i], "-full")) {
         xnestFullGeneration = TRUE;
@@ -128,10 +120,7 @@ ddxProcessArgument(int argc, char *argv[], int i)
     }
     if (!strcmp(argv[i], "-geometry")) {
         if (++i < argc) {
-            xnestUserGeometry = XParseGeometry(argv[i],
-                                               &xnestX, &xnestY,
-                                               &xnestWidth, &xnestHeight);
-            if (xnestUserGeometry)
+            if (xnest_parse_geometry(argv[i], &xnestGeometry))
                 return 2;
         }
         return 0;
@@ -181,7 +170,6 @@ void
 ddxUseMsg(void)
 {
     ErrorF("-display string        display name of the real server\n");
-    ErrorF("-sync                  sinchronize with the real server\n");
     ErrorF("-full                  utilize full regeneration\n");
     ErrorF("-class string          default visual class\n");
     ErrorF("-depth int             default depth\n");

@@ -34,8 +34,8 @@ is" without express or implied warranty.
 #include "mi.h"
 #include "dixfontstr.h"
 #include "extinit_priv.h"
-#include "Xnest.h"
 
+#include "xnest-xcb.h"
 #include "Display.h"
 #include "Screen.h"
 #include "Pointer.h"
@@ -63,29 +63,37 @@ GlxExtensionInit(void)
 void
 InitOutput(ScreenInfo * screen_info, int argc, char *argv[])
 {
-    int i, j;
+    int i;
 
     xnestOpenDisplay(argc, argv);
 
-    screen_info->imageByteOrder = ImageByteOrder(xnestDisplay);
-    screen_info->bitmapScanlineUnit = BitmapUnit(xnestDisplay);
-    screen_info->bitmapScanlinePad = BitmapPad(xnestDisplay);
-    screen_info->bitmapBitOrder = BitmapBitOrder(xnestDisplay);
-
+    screen_info->imageByteOrder = xnestUpstreamInfo.setup->image_byte_order;
+    screen_info->bitmapScanlineUnit = xnestUpstreamInfo.setup->bitmap_format_scanline_unit;
+    screen_info->bitmapScanlinePad = xnestUpstreamInfo.setup->bitmap_format_scanline_pad;
+    screen_info->bitmapBitOrder = xnestUpstreamInfo.setup->bitmap_format_bit_order;
     screen_info->numPixmapFormats = 0;
-    for (i = 0; i < xnestNumPixmapFormats; i++)
-        for (j = 0; j < xnestNumDepths; j++)
-            if ((xnestPixmapFormats[i].depth == 1) ||
-                (xnestPixmapFormats[i].depth == xnestDepths[j])) {
+
+    xcb_format_t *fmt = xcb_setup_pixmap_formats(xnestUpstreamInfo.setup);
+    const xcb_format_t *fmtend = fmt + xcb_setup_pixmap_formats_length(xnestUpstreamInfo.setup);
+    for(; fmt != fmtend; ++fmt) {
+        xcb_depth_iterator_t depth_iter;
+        for (depth_iter = xcb_screen_allowed_depths_iterator(xnestUpstreamInfo.screenInfo);
+             depth_iter.rem;
+             xcb_depth_next(&depth_iter))
+        {
+            if ((fmt->depth == 1) ||
+                (fmt->depth == depth_iter.data->depth)) {
                 screen_info->formats[screen_info->numPixmapFormats].depth =
-                    xnestPixmapFormats[i].depth;
+                    fmt->depth;
                 screen_info->formats[screen_info->numPixmapFormats].bitsPerPixel =
-                    xnestPixmapFormats[i].bits_per_pixel;
+                    fmt->bits_per_pixel;
                 screen_info->formats[screen_info->numPixmapFormats].scanlinePad =
-                    xnestPixmapFormats[i].scanline_pad;
+                    fmt->scanline_pad;
                 screen_info->numPixmapFormats++;
                 break;
             }
+        }
+    }
 
     xnestFontPrivateIndex = xfont2_allocate_font_private_index();
 
@@ -121,7 +129,10 @@ InitInput(int argc, char *argv[])
 
     mieqInit();
 
-    SetNotifyFd(XConnectionNumber(xnestDisplay), xnestNotifyConnection, X_NOTIFY_READ, NULL);
+    SetNotifyFd(xcb_get_file_descriptor(xnestUpstreamInfo.conn),
+                xnestNotifyConnection,
+                X_NOTIFY_READ,
+                NULL);
 
     RegisterBlockAndWakeupHandlers(xnestBlockHandler, xnestWakeupHandler, NULL);
 }

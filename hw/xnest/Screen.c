@@ -14,9 +14,14 @@ is" without express or implied warranty.
 
 #include <xnest-config.h>
 
+#include <xcb/xcb.h>
+#include <xcb/xcb_aux.h>
+
 #include <X11/X.h>
 #include <X11/Xdefs.h>
 #include <X11/Xproto.h>
+
+#include <xcb/xcb_icccm.h>
 
 #include "mi/mi_priv.h"
 
@@ -27,7 +32,7 @@ is" without express or implied warranty.
 #include "colormapst.h"
 #include "resource.h"
 
-#include "Xnest.h"
+#include "xnest-xcb.h"
 
 #include "Display.h"
 #include "Screen.h"
@@ -37,20 +42,19 @@ is" without express or implied warranty.
 #include "XNFont.h"
 #include "Color.h"
 #include "XNCursor.h"
-#include "Visual.h"
 #include "Events.h"
 #include "Init.h"
 #include "mipointer.h"
 #include "Args.h"
 #include "mipointrst.h"
 
-Window xnestDefaultWindows[MAXSCREENS];
-Window xnestScreenSaverWindows[MAXSCREENS];
+xcb_window_t xnestDefaultWindows[MAXSCREENS];
+xcb_window_t xnestScreenSaverWindows[MAXSCREENS];
 DevPrivateKeyRec xnestScreenCursorFuncKeyRec;
 DevScreenPrivateKeyRec xnestScreenCursorPrivKeyRec;
 
 ScreenPtr
-xnestScreen(Window window)
+xnestScreen(xcb_window_t window)
 {
     int i;
 
@@ -80,23 +84,28 @@ xnestSaveScreen(ScreenPtr pScreen, int what)
     else {
         switch (what) {
         case SCREEN_SAVER_ON:
-            XMapRaised(xnestDisplay, xnestScreenSaverWindows[pScreen->myNum]);
+            xcb_map_window(xnestUpstreamInfo.conn, xnestScreenSaverWindows[pScreen->myNum]);
+            uint32_t value = XCB_STACK_MODE_ABOVE;
+            xcb_configure_window(xnestUpstreamInfo.conn,
+                                 xnestScreenSaverWindows[pScreen->myNum],
+                                 XCB_CONFIG_WINDOW_STACK_MODE,
+                                 &value);
             xnestSetScreenSaverColormapWindow(pScreen);
             break;
 
         case SCREEN_SAVER_OFF:
-            XUnmapWindow(xnestDisplay, xnestScreenSaverWindows[pScreen->myNum]);
+            xcb_unmap_window(xnestUpstreamInfo.conn, xnestScreenSaverWindows[pScreen->myNum]);
             xnestSetInstalledColormapWindows(pScreen);
             break;
 
         case SCREEN_SAVER_FORCER:
             lastEventTime = GetTimeInMillis();
-            XUnmapWindow(xnestDisplay, xnestScreenSaverWindows[pScreen->myNum]);
+            xcb_unmap_window(xnestUpstreamInfo.conn, xnestScreenSaverWindows[pScreen->myNum]);
             xnestSetInstalledColormapWindows(pScreen);
             break;
 
         case SCREEN_SAVER_CYCLE:
-            XUnmapWindow(xnestDisplay, xnestScreenSaverWindows[pScreen->myNum]);
+            xcb_unmap_window(xnestUpstreamInfo.conn, xnestScreenSaverWindows[pScreen->myNum]);
             xnestSetInstalledColormapWindows(pScreen);
             break;
         }
@@ -130,17 +139,35 @@ static miPointerSpriteFuncRec xnestPointerSpriteFuncs = {
     xnestDeviceCursorCleanup
 };
 
+static int add_depth_visual(DepthPtr depths, int numDepths, int nplanes, VisualID vid)
+{
+    DepthPtr walk = NULL;
+
+    for (int j = 0; j < numDepths; j++)
+        if (depths[j].depth == nplanes) {
+            walk = &depths[j];
+            break;
+        }
+
+    if (!walk) {
+        walk = &depths[numDepths++];
+        walk->depth = nplanes;
+        walk->numVids = 0;
+        walk->vids = (VisualID *) malloc(MAXVISUALSPERDEPTH * sizeof(VisualID));
+    }
+    if (walk->numVids >= MAXVISUALSPERDEPTH) {
+        FatalError("Visual table overflow");
+    }
+    walk->vids[walk->numVids] = vid;
+    walk->numVids++;
+
+    return numDepths;
+}
+
 Bool
 xnestOpenScreen(ScreenPtr pScreen, int argc, char *argv[])
 {
-    VisualPtr visuals;
-    DepthPtr depths;
-    int numVisuals, numDepths;
-    int i, j, depthIndex;
     unsigned long valuemask;
-    XSetWindowAttributes attributes;
-    XWindowAttributes gattributes;
-    XSizeHints sizeHints;
     VisualID defaultVisual;
     int rootDepth;
     miPointerScreenPtr PointPriv;
@@ -165,96 +192,134 @@ xnestOpenScreen(ScreenPtr pScreen, int argc, char *argv[])
                                      PRIVATE_CURSOR, 0))
         return FALSE;
 
-    visuals = xallocarray(xnestNumVisuals, sizeof(VisualRec));
-    numVisuals = 0;
+    int numVisuals = 0;
+    VisualPtr visuals = calloc(1, sizeof(VisualRec));
+    int numDepths = 1;
+    DepthPtr depths = calloc(MAXDEPTH, sizeof(DepthRec));
 
-    depths = (DepthPtr) malloc(MAXDEPTH * sizeof(DepthRec));
+    if (!visuals || !depths) {
+        free(visuals);
+        free(depths);
+        return FALSE;
+    }
+
+    if (!xnestVisualMap)
+        xnestVisualMap = calloc(1, sizeof(xnest_visual_t));
+    else
+        xnestVisualMap = reallocarray(xnestVisualMap, xnestNumVisualMap+1, sizeof(xnest_visual_t));
+
     depths[0].depth = 1;
     depths[0].numVids = 0;
-    depths[0].vids = (VisualID *) malloc(MAXVISUALSPERDEPTH * sizeof(VisualID));
-    numDepths = 1;
+    depths[0].vids = calloc(MAXVISUALSPERDEPTH, sizeof(VisualID));
 
-    for (i = 0; i < xnestNumVisuals; i++) {
-        visuals[numVisuals].class = xnestVisuals[i].class;
-        visuals[numVisuals].bitsPerRGBValue = xnestVisuals[i].bits_per_rgb;
-        visuals[numVisuals].ColormapEntries = xnestVisuals[i].colormap_size;
-        visuals[numVisuals].nplanes = xnestVisuals[i].depth;
-        visuals[numVisuals].redMask = xnestVisuals[i].red_mask;
-        visuals[numVisuals].greenMask = xnestVisuals[i].green_mask;
-        visuals[numVisuals].blueMask = xnestVisuals[i].blue_mask;
-        visuals[numVisuals].offsetRed = offset(xnestVisuals[i].red_mask);
-        visuals[numVisuals].offsetGreen = offset(xnestVisuals[i].green_mask);
-        visuals[numVisuals].offsetBlue = offset(xnestVisuals[i].blue_mask);
-
-        /* Check for and remove duplicates. */
-        for (j = 0; j < numVisuals; j++) {
-            if (visuals[numVisuals].class == visuals[j].class &&
-                visuals[numVisuals].bitsPerRGBValue ==
-                visuals[j].bitsPerRGBValue &&
-                visuals[numVisuals].ColormapEntries ==
-                visuals[j].ColormapEntries &&
-                visuals[numVisuals].nplanes == visuals[j].nplanes &&
-                visuals[numVisuals].redMask == visuals[j].redMask &&
-                visuals[numVisuals].greenMask == visuals[j].greenMask &&
-                visuals[numVisuals].blueMask == visuals[j].blueMask &&
-                visuals[numVisuals].offsetRed == visuals[j].offsetRed &&
-                visuals[numVisuals].offsetGreen == visuals[j].offsetGreen &&
-                visuals[numVisuals].offsetBlue == visuals[j].offsetBlue)
-                break;
-        }
-        if (j < numVisuals)
-            break;
-
-        visuals[numVisuals].vid = FakeClientID(0);
-
-        depthIndex = UNDEFINED;
-        for (j = 0; j < numDepths; j++)
-            if (depths[j].depth == xnestVisuals[i].depth) {
-                depthIndex = j;
-                break;
+    int found_default_visual = 0;
+    xcb_depth_iterator_t depth_iter;
+    for (depth_iter = xcb_screen_allowed_depths_iterator(xnestUpstreamInfo.screenInfo);
+         depth_iter.rem;
+         xcb_depth_next(&depth_iter))
+    {
+        int vlen = xcb_depth_visuals_length (depth_iter.data);
+        xcb_visualtype_t *vts = xcb_depth_visuals (depth_iter.data);
+        for (int x=0; x<vlen; x++) {
+            for (int j = 0; j < numVisuals; j++) {
+                if (vts[x]._class == visuals[j].class &&
+                    vts[x].bits_per_rgb_value == visuals[j].bitsPerRGBValue &&
+                    vts[x].colormap_entries == visuals[j].ColormapEntries &&
+                    depth_iter.data->depth == visuals[j].nplanes &&
+                    vts[x].red_mask == visuals[j].redMask &&
+                    vts[x].green_mask == visuals[j].greenMask &&
+                    vts[x].blue_mask == visuals[j].blueMask &&
+                    offset(vts[x].red_mask) == visuals[j].offsetRed &&
+                    offset(vts[x].green_mask) == visuals[j].offsetGreen &&
+                    offset(vts[x].blue_mask) == visuals[j].offsetBlue)
+                        goto breakout;
             }
 
-        if (depthIndex == UNDEFINED) {
-            depthIndex = numDepths;
-            depths[depthIndex].depth = xnestVisuals[i].depth;
-            depths[depthIndex].numVids = 0;
-            depths[depthIndex].vids =
-                (VisualID *) malloc(MAXVISUALSPERDEPTH * sizeof(VisualID));
-            numDepths++;
-        }
-        if (depths[depthIndex].numVids >= MAXVISUALSPERDEPTH) {
-            FatalError("Visual table overflow");
-        }
-        depths[depthIndex].vids[depths[depthIndex].numVids] =
-            visuals[numVisuals].vid;
-        depths[depthIndex].numVids++;
+            visuals[numVisuals] = (VisualRec) {
+                .class = vts[x]._class,
+                .bitsPerRGBValue = vts[x].bits_per_rgb_value,
+                .ColormapEntries = vts[x].colormap_entries,
+                .nplanes = depth_iter.data->depth,
+                .redMask = vts[x].red_mask,
+                .greenMask = vts[x].green_mask,
+                .blueMask = vts[x].blue_mask,
+                .offsetRed = offset(vts[x].red_mask),
+                .offsetGreen = offset(vts[x].green_mask),
+                .offsetBlue = offset(vts[x].blue_mask),
+                .vid = FakeClientID(0),
+            };
 
-        numVisuals++;
+            xnestVisualMap[xnestNumVisualMap] = (xnest_visual_t) {
+                .ourXID = visuals[numVisuals].vid,
+                .ourVisual = &visuals[numVisuals],
+                .upstreamDepth = depth_iter.data,
+                .upstreamVisual = &vts[x],
+                .upstreamCMap = xcb_generate_id(xnestUpstreamInfo.conn),
+            };
+
+            xcb_create_colormap(xnestUpstreamInfo.conn,
+                                XCB_COLORMAP_ALLOC_NONE,
+                                xnestVisualMap[xnestNumVisualMap].upstreamCMap,
+                                xnestUpstreamInfo.screenInfo->root,
+                                xnestVisualMap[xnestNumVisualMap].upstreamVisual->visual_id);
+
+            numDepths = add_depth_visual(depths, numDepths, visuals[numVisuals].nplanes, visuals[numVisuals].vid);
+
+            if (xnestUserDefaultClass || xnestUserDefaultDepth) {
+                if ((!xnestDefaultClass || visuals[numVisuals].class == xnestDefaultClass) &&
+                    (!xnestDefaultDepth || visuals[numVisuals].nplanes == xnestDefaultDepth))
+                {
+                    defaultVisual = visuals[numVisuals].vid;
+                    rootDepth = visuals[numVisuals].nplanes;
+                    found_default_visual = 1;
+                }
+            }
+            else
+            {
+                VisualID visual_id = xnestUpstreamInfo.screenInfo->root_visual;
+                if (visual_id == vts[x].visual_id) {
+                    defaultVisual = visuals[numVisuals].vid;
+                    rootDepth = visuals[numVisuals].nplanes;
+                    found_default_visual = 1;
+                }
+            }
+
+            numVisuals++;
+            xnestNumVisualMap++;
+            visuals = reallocarray(visuals, numVisuals+1, sizeof(VisualRec));
+            xnestVisualMap = reallocarray(xnestVisualMap, xnestNumVisualMap+1, sizeof(xnest_visual_t));
+        }
     }
+breakout:
     visuals = reallocarray(visuals, numVisuals, sizeof(VisualRec));
+    xnestVisualMap = reallocarray(xnestVisualMap, xnestNumVisualMap, sizeof(xnest_visual_t));
 
-    defaultVisual = visuals[xnestDefaultVisualIndex].vid;
-    rootDepth = visuals[xnestDefaultVisualIndex].nplanes;
+    if (!found_default_visual) {
+        ErrorF("Xnest: can't find matching visual for user specified depth %d\n", xnestDefaultDepth);
+        defaultVisual = visuals[0].vid;
+        rootDepth = visuals[0].nplanes;
+    }
 
     if (xnestParentWindow != 0) {
-        XGetWindowAttributes(xnestDisplay, xnestParentWindow, &gattributes);
-        xnestWidth = gattributes.width;
-        xnestHeight = gattributes.height;
+        xRectangle r = xnest_get_geometry(xnestUpstreamInfo.conn, xnestParentWindow);
+        xnestGeometry.width = r.width;
+        xnestGeometry.height = r.height;
     }
 
     /* myNum */
     /* id */
-    if (!miScreenInit(pScreen, NULL, xnestWidth, xnestHeight, 1, 1, xnestWidth, rootDepth, numDepths, depths, defaultVisual, /* root visual */
+    if (!miScreenInit(pScreen, NULL, xnestGeometry.width, xnestGeometry.height,
+                      1, 1, xnestGeometry.width, rootDepth, numDepths, depths, defaultVisual, /* root visual */
                       numVisuals, visuals))
         return FALSE;
 
     pScreen->defColormap = (Colormap) FakeClientID(0);
     pScreen->minInstalledCmaps = MINCMAPS;
     pScreen->maxInstalledCmaps = MAXCMAPS;
-    pScreen->backingStoreSupport = NotUseful;
-    pScreen->saveUnderSupport = NotUseful;
-    pScreen->whitePixel = xnestWhitePixel;
-    pScreen->blackPixel = xnestBlackPixel;
+    pScreen->backingStoreSupport = XCB_BACKING_STORE_NOT_USEFUL;
+    pScreen->saveUnderSupport = XCB_BACKING_STORE_NOT_USEFUL;
+    pScreen->whitePixel = xnestUpstreamInfo.screenInfo->white_pixel;
+    pScreen->blackPixel = xnestUpstreamInfo.screenInfo->black_pixel;
     /* GCperDepth */
     /* defaultStipple */
     /* WindowPrivateLen */
@@ -280,9 +345,10 @@ xnestOpenScreen(ScreenPtr pScreen, int argc, char *argv[])
     pScreen->RealizeWindow = xnestRealizeWindow;
     pScreen->UnrealizeWindow = xnestUnrealizeWindow;
     pScreen->PostValidateTree = NULL;
-    pScreen->WindowExposures = xnestWindowExposures;
+    pScreen->WindowExposures = miWindowExposures;
     pScreen->CopyWindow = xnestCopyWindow;
     pScreen->ClipNotify = xnestClipNotify;
+    pScreen->ClearToBackground = xnest_screen_ClearToBackground;
 
     /* Pixmap procedures */
 
@@ -323,13 +389,12 @@ xnestOpenScreen(ScreenPtr pScreen, int argc, char *argv[])
                   &xnestCursorFuncs);
     PointPriv->spriteFuncs = &xnestPointerSpriteFuncs;
 
-    pScreen->mmWidth = xnestWidth * DisplayWidthMM(xnestDisplay,
-                                                   DefaultScreen(xnestDisplay))
-        / DisplayWidth(xnestDisplay, DefaultScreen(xnestDisplay));
+    pScreen->mmWidth =
+        xnestGeometry.width * xnestUpstreamInfo.screenInfo->width_in_millimeters /
+        xnestUpstreamInfo.screenInfo->width_in_pixels;
     pScreen->mmHeight =
-        xnestHeight * DisplayHeightMM(xnestDisplay,
-                                      DefaultScreen(xnestDisplay)) /
-        DisplayHeight(xnestDisplay, DefaultScreen(xnestDisplay));
+        xnestGeometry.height * xnestUpstreamInfo.screenInfo->height_in_millimeters /
+        xnestUpstreamInfo.screenInfo->height_in_pixels;
 
     /* overwrite miCloseScreen with our own */
     pScreen->CloseScreen = xnestCloseScreen;
@@ -339,68 +404,111 @@ xnestOpenScreen(ScreenPtr pScreen, int argc, char *argv[])
 
     /* devPrivates */
 
-#define POSITION_OFFSET (pScreen->myNum * (xnestWidth + xnestHeight) / 32)
+#define POSITION_OFFSET (pScreen->myNum * (xnestGeometry.width + xnestGeometry.height) / 32)
 
     if (xnestDoFullGeneration) {
 
-        valuemask = CWBackPixel | CWEventMask | CWColormap;
-        attributes.background_pixel = xnestWhitePixel;
-        attributes.event_mask = xnestEventMask;
-        attributes.colormap =
-            xnestDefaultVisualColormap(xnestDefaultVisual(pScreen));
+        xcb_params_cw_t attributes = {
+            .back_pixel = xnestUpstreamInfo.screenInfo->white_pixel,
+            .event_mask = xnestEventMask,
+            .colormap = xnest_visual_to_upstream_cmap(pScreen->rootVisual),
+        };
+
+        valuemask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK | XCB_CW_COLORMAP;
 
         if (xnestParentWindow != 0) {
             xnestDefaultWindows[pScreen->myNum] = xnestParentWindow;
-            XSelectInput(xnestDisplay, xnestDefaultWindows[pScreen->myNum],
-                         xnestEventMask);
+            xcb_change_window_attributes(xnestUpstreamInfo.conn,
+                                         xnestDefaultWindows[pScreen->myNum],
+                                         XCB_CW_EVENT_MASK,
+                                         &xnestEventMask);
         }
-        else
-            xnestDefaultWindows[pScreen->myNum] =
-                XCreateWindow(xnestDisplay,
-                              DefaultRootWindow(xnestDisplay),
-                              xnestX + POSITION_OFFSET,
-                              xnestY + POSITION_OFFSET,
-                              xnestWidth, xnestHeight,
-                              xnestBorderWidth,
-                              pScreen->rootDepth,
-                              InputOutput,
-                              xnestDefaultVisual(pScreen),
-                              valuemask, &attributes);
+        else {
+            xnestDefaultWindows[pScreen->myNum] = xcb_generate_id(xnestUpstreamInfo.conn);
+            xcb_aux_create_window(xnestUpstreamInfo.conn,
+                                  pScreen->rootDepth,
+                                  xnestDefaultWindows[pScreen->myNum],
+                                  xnestUpstreamInfo.screenInfo->root,
+                                  xnestGeometry.x + POSITION_OFFSET,
+                                  xnestGeometry.y + POSITION_OFFSET,
+                                  xnestGeometry.width,
+                                  xnestGeometry.height,
+                                  xnestBorderWidth,
+                                  XCB_WINDOW_CLASS_INPUT_OUTPUT,
+                                  xnest_visual_map_to_upstream(pScreen->rootVisual),
+                                  valuemask,
+                                  &attributes);
+        }
 
         if (!xnestWindowName)
             xnestWindowName = argv[0];
 
-        sizeHints.flags = PPosition | PSize | PMaxSize;
-        sizeHints.x = xnestX + POSITION_OFFSET;
-        sizeHints.y = xnestY + POSITION_OFFSET;
-        sizeHints.width = sizeHints.max_width = xnestWidth;
-        sizeHints.height = sizeHints.max_height = xnestHeight;
-        if (xnestUserGeometry & XValue || xnestUserGeometry & YValue)
-            sizeHints.flags |= USPosition;
-        if (xnestUserGeometry & WidthValue || xnestUserGeometry & HeightValue)
-            sizeHints.flags |= USSize;
-        XSetStandardProperties(xnestDisplay,
-                               xnestDefaultWindows[pScreen->myNum],
-                               xnestWindowName,
-                               xnestWindowName,
-                               xnestIconBitmap, argv, argc, &sizeHints);
+        xcb_size_hints_t sizeHints = {
+            .flags = XCB_ICCCM_SIZE_HINT_P_POSITION | XCB_ICCCM_SIZE_HINT_P_SIZE | XCB_ICCCM_SIZE_HINT_P_MAX_SIZE,
+            .x = xnestGeometry.x + POSITION_OFFSET,
+            .y = xnestGeometry.y + POSITION_OFFSET,
+            .width = xnestGeometry.width,
+            .height = xnestGeometry.height,
+            .max_width = xnestGeometry.width,
+            .max_height = xnestGeometry.height,
+        };
 
-        XMapWindow(xnestDisplay, xnestDefaultWindows[pScreen->myNum]);
+        if (xnestUserGeometry & XCB_CONFIG_WINDOW_X ||
+            xnestUserGeometry & XCB_CONFIG_WINDOW_Y)
+            sizeHints.flags |= XCB_ICCCM_SIZE_HINT_US_POSITION;
+        if (xnestUserGeometry & XCB_CONFIG_WINDOW_WIDTH ||
+            xnestUserGeometry & XCB_CONFIG_WINDOW_HEIGHT)
+            sizeHints.flags |= XCB_ICCCM_SIZE_HINT_US_SIZE;
 
-        valuemask = CWBackPixmap | CWColormap;
-        attributes.background_pixmap = xnestScreenSaverPixmap;
-        attributes.colormap =
-            DefaultColormap(xnestDisplay, DefaultScreen(xnestDisplay));
-        xnestScreenSaverWindows[pScreen->myNum] =
-            XCreateWindow(xnestDisplay,
+        const size_t windowNameLen = strlen(xnestWindowName);
+
+        xcb_icccm_set_wm_name_checked(xnestUpstreamInfo.conn,
+                                      xnestDefaultWindows[pScreen->myNum],
+                                      XCB_ATOM_STRING,
+                                      8,
+                                      windowNameLen,
+                                      xnestWindowName);
+
+        xcb_icccm_set_wm_icon_name_checked(xnestUpstreamInfo.conn,
+                                           xnestDefaultWindows[pScreen->myNum],
+                                           XCB_ATOM_STRING,
+                                           8,
+                                           windowNameLen,
+                                           xnestWindowName);
+
+        xnest_set_command(xnestUpstreamInfo.conn,
                           xnestDefaultWindows[pScreen->myNum],
-                          0, 0, xnestWidth, xnestHeight, 0,
-                          DefaultDepth(xnestDisplay,
-                                       DefaultScreen(xnestDisplay)),
-                          InputOutput, DefaultVisual(xnestDisplay,
-                                                     DefaultScreen
-                                                     (xnestDisplay)), valuemask,
-                          &attributes);
+                          argv, argc);
+
+        xcb_icccm_wm_hints_t wmhints = {
+            .icon_pixmap = xnestIconBitmap,
+            .flags = XCB_ICCCM_WM_HINT_ICON_PIXMAP,
+        };
+
+        xcb_icccm_set_wm_hints_checked(xnestUpstreamInfo.conn,
+                                       xnestDefaultWindows[pScreen->myNum],
+                                       &wmhints);
+
+        xcb_map_window(xnestUpstreamInfo.conn, xnestDefaultWindows[pScreen->myNum]);
+
+        valuemask = XCB_CW_BACK_PIXMAP | XCB_CW_COLORMAP;
+        attributes.back_pixmap = xnestScreenSaverPixmap;
+        attributes.colormap = xnestUpstreamInfo.screenInfo->default_colormap;
+
+        xnestScreenSaverWindows[pScreen->myNum] = xcb_generate_id(xnestUpstreamInfo.conn);
+        xcb_aux_create_window(xnestUpstreamInfo.conn,
+                              xnestUpstreamInfo.screenInfo->root_depth,
+                              xnestScreenSaverWindows[pScreen->myNum],
+                              xnestDefaultWindows[pScreen->myNum],
+                              0,
+                              0,
+                              xnestGeometry.width,
+                              xnestGeometry.height,
+                              0,
+                              XCB_WINDOW_CLASS_INPUT_OUTPUT,
+                              xnestUpstreamInfo.screenInfo->root_visual,
+                              valuemask,
+                              &attributes);
     }
 
     if (!xnestCreateDefaultColormap(pScreen))
