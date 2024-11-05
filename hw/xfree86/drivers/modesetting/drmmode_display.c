@@ -3172,7 +3172,8 @@ drmmode_output_set_property(xf86OutputPtr output, Atom property,
 
     for (i = 0; i < drmmode_output->num_props; i++) {
         drmmode_prop_ptr p = &drmmode_output->props[i];
-
+	if (p->num_atoms == 0)
+	    continue;
         if (p->atoms[0] != property)
             continue;
 
